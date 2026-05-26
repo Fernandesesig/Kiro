@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Auto Push GitHub",
+  "description": "Faz commit e push automático para o GitHub toda vez que o index.html é salvo",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/PROJETOS KIRO ESIG/index.html"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "cd \"c:\\Users\\Evelyn Fernandes\\Documents\\PROJETOS KIRO ESIG\" && git add index.html && git commit -m \"atualização automática\" && git push origin main",
+    "timeout": 30
+  },
+  "workspaceFolderName": "PROJETOS KIRO ESIG",
+  "shortName": "auto-push-github"
+}

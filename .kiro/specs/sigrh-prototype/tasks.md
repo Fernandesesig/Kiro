@@ -1,0 +1,391 @@
+# Plano de Implementação: SIGRH Protótipo
+
+## Visão Geral
+
+Implementar as 85 funcionalidades do protótipo SIGRH como páginas JavaScript no `index.html`, organizadas por módulo. Cada funcionalidade requer: entrada no array `menu`, função JS que chama `showPage()`, e página com filtros, tabela grid mockada e botões de ação.
+
+## Tarefas
+
+- [ ] 1. Módulo Pessoa
+  - [ ] 1.1 Implementar Pessoa > Cadastro > Manter Pessoas
+    - Adicionar entrada no array `menu` para o módulo Pessoa com submódulo Cadastro
+    - Criar função `mantPessoas()` com filtros (nome, CPF, matrícula, situação), tabela grid com colunas Matrícula/Nome/CPF/Nascimento/Situação e dados mockados, botões Novo/Editar/Excluir, modal de formulário com campos: nome completo, CPF, data de nascimento, sexo, nacionalidade, contato
+    - _Requisitos: 1.1, 1.2, 1.4, 1.6, 1.7_
+  - [ ] 1.2 Implementar Pessoa > Corrida do Servidor > Baixar Inscrições
+    - Adicionar submódulo Corrida do Servidor ao módulo Pessoa
+    - Criar função `baixarInscricoes()` com seletor de evento, tabela de inscritos por categoria com total, botão de download
+    - _Requisitos: 2.1, 2.2, 2.3, 2.4_
+
+- [ ] 2. Módulo Recadastramentos
+  - [ ] 2.1 Implementar Recadastramentos > Recadastramento > Validar Recadastramento
+    - Atualizar entrada existente no array `menu` para `validarRecadastramento`
+    - Criar/atualizar função `validarRecadastramento()` com filtros por situação (pendente/validado/rejeitado), tabela grid com servidor/prazo/situação, botões Aprovar/Rejeitar, modal de rejeição com campo motivo obrigatório
+    - _Requisitos: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+  - [ ] 2.2 Implementar Recadastramentos > Recadastramento > Manter Recadastramento
+    - Atualizar entrada existente no array `menu` para `mantRecadastramento`
+    - Criar/atualizar função `mantRecadastramento()` com filtros por período/servidor, tabela de períodos de recadastramento com data início/fim/situação, botão Novo Período, modal com campos data início, data encerramento e órgão
+    - _Requisitos: 4.1, 4.2, 4.4, 4.5_
+
+- [ ] 3. Módulo Frequência
+  - [ ] 3.1 Implementar Frequência > Gestão da Frequência pelo RH > Analisar Solicitações
+    - Adicionar submódulo Gestão da Frequência pelo RH ao módulo Frequência
+    - Criar função `analisarSolicitacoes()` com filtros por período/servidor/unidade/situação, tabela grid com servidor/data/tipo/situação, botões Aprovar/Rejeitar, modal de rejeição com motivo obrigatório
+    - _Requisitos: 5.1, 5.2, 5.3, 5.4, 5.5_
+  - [ ] 3.2 Implementar Frequência > Gestão da Frequência pelo RH > Efetivar Registro de Ponto na Folha
+    - Criar função `efetivarPonto()` com filtros por competência (mês/ano) e unidade organizacional, tabela de registros aprovados, botão Efetivar, resumo de registros pendentes com inconsistências
+    - _Requisitos: 6.1, 6.2, 6.3, 6.4_
+  - [ ] 3.3 Implementar Frequência > Gestão da Frequência pelo RH > Monitorar Inconsistências
+    - Criar função `monitorarInconsistencias()` com painel de totais por tipo/unidade, tabela de inconsistências com criticidade (bloqueante/não bloqueante), botão Exportar
+    - _Requisitos: 7.1, 7.2, 7.3, 7.4, 7.5_
+  - [ ] 3.4 Implementar Frequência > Solicitação de Frequência > Solicitar Frequência
+    - Adicionar submódulo Solicitação de Frequência ao módulo Frequência
+    - Criar função `solicitarFrequencia()` com calendário mensal mockado, formulário de nova solicitação com data/tipo de ocorrência/justificativa, tabela de solicitações do servidor
+    - _Requisitos: 8.1, 8.2, 8.3, 8.5_
+  - [ ] 3.5 Implementar Frequência > Solicitação de Frequência > Ajuste de Ponto
+    - Criar função `ajustePonto()` com seletor de período, tabela de registros com horários entrada/saída, modal de ajuste com horário correto e justificativa obrigatória
+    - _Requisitos: 9.1, 9.2, 9.3, 9.4_
+
+- [ ] 4. Módulo Organização
+  - [ ] 4.1 Implementar Organização > Bancos/Agências > Manter Agências
+    - Adicionar módulo Organização com submódulo Bancos/Agências ao array `menu`
+    - Criar função `mantAgencias()` com filtros por banco/número/município, tabela grid com banco/número/dígito/nome/município/situação, botões Novo/Editar/Inativar, modal com campos banco, número, dígito, nome, município
+    - _Requisitos: 10.1, 10.2, 10.3, 10.4_
+  - [ ] 4.2 Implementar Organização > Bancos/Agências > Manter Bancos
+    - Criar função `mantBancos()` com filtros por código/nome, tabela grid com código COMPE/nome/situação, botões Novo/Editar/Inativar, modal com campos código COMPE, nome, situação
+    - _Requisitos: 11.1, 11.2, 11.3, 11.4_
+  - [ ] 4.3 Implementar Organização > Calendário > Manter Calendário do Agrupamento
+    - Adicionar submódulo Calendário ao módulo Organização
+    - Criar função `mantCalendarioAgrupamento()` com visualização mensal mockada, tabela de datas cadastradas com tipo/descrição, botões Novo/Editar/Excluir/Copiar Exercício, modal com campos data, tipo, descrição
+    - _Requisitos: 12.1, 12.2, 12.3, 12.4_
+  - [ ] 4.4 Implementar Organização > Calendário > Manter Calendário do Órgão
+    - Criar função `mantCalendarioOrgao()` com seletor de órgão, tabela de datas específicas do órgão, composição com calendário do agrupamento, botões Novo/Excluir
+    - _Requisitos: 13.1, 13.2, 13.3_
+  - [ ] 4.5 Implementar Organização > Endereçamento > Manter Municípios
+    - Adicionar submódulo Endereçamento ao módulo Organização
+    - Criar função `mantMunicipios()` com filtros por nome/UF, tabela grid com nome/UF/código IBGE/situação, botões Novo/Editar/Inativar, modal com campos nome, UF, código IBGE, situação
+    - _Requisitos: 14.1, 14.2, 14.3, 14.4_
+  - [ ] 4.6 Implementar Organização > Endereçamento > Manter Bairros
+    - Criar função `mantBairros()` com filtros por nome/município, tabela grid com nome/município/situação, botões Novo/Editar/Excluir, modal com campos nome e município
+    - _Requisitos: 15.1, 15.2, 15.3_
+  - [ ] 4.7 Implementar Organização > Endereçamento > Manter Países
+    - Criar função `mantPaises()` com filtros por nome/sigla, tabela grid com nome/sigla/código ISO/situação, botões Novo/Editar/Excluir, modal com campos nome, sigla, código ISO
+    - _Requisitos: 16.1, 16.2, 16.3_
+  - [ ] 4.8 Implementar Organização > Endereçamento > Manter Tipo de Logradouro
+    - Criar função `mantTipoLogradouro()` com tabela grid com sigla/descrição/situação, botões Novo/Editar/Inativar, modal com campos sigla e descrição
+    - _Requisitos: 17.1, 17.2, 17.3_
+  - [ ] 4.9 Implementar Organização > Estrutura Organizacional > Consultar Organograma
+    - Adicionar submódulo Estrutura Organizacional ao módulo Organização
+    - Criar função `consultarOrganograma()` com árvore hierárquica mockada expansível/recolhível, painel lateral com detalhes do nó selecionado (nome, sigla, responsável, qtd servidores), botão Exportar
+    - _Requisitos: 18.1, 18.2, 18.3, 18.4_
+  - [ ] 4.10 Implementar Organização > Estrutura Organizacional > Manter Órgãos
+    - Criar função `mantOrgaos()` com filtros por nome/sigla/situação, tabela grid com nome/sigla/CNPJ/tipo/situação, botões Novo/Editar/Inativar, modal com campos nome, sigla, CNPJ, tipo, órgão superior, situação
+    - _Requisitos: 19.1, 19.2, 19.3, 19.4, 19.5_
+  - [ ] 4.11 Implementar Organização > Estrutura Organizacional > Manter Unidades Organizacionais
+    - Criar função `mantUnidades()` com filtros por nome/sigla/órgão, tabela grid com nome/sigla/órgão/unidade superior/situação, botões Novo/Editar/Inativar, modal com campos nome, sigla, órgão, unidade superior, situação
+    - _Requisitos: 20.1, 20.2, 20.3, 20.4, 20.5_
+  - [ ] 4.12 Implementar Organização > Ocupação > Manter Ocupação
+    - Adicionar submódulo Ocupação ao módulo Organização
+    - Criar função `mantOcupacao()` com filtros por código CBO/descrição, tabela grid com código CBO/descrição/situação, botões Novo/Editar/Inativar, modal com campos código CBO, descrição, situação
+    - _Requisitos: 21.1, 21.2, 21.3_
+  - [ ] 4.13 Implementar Organização > Ocupação > Manter Atividades
+    - Criar função `mantAtividades()` com filtros por descrição/ocupação, tabela grid com descrição/ocupação/situação, botões Novo/Editar/Inativar, modal com campos descrição, ocupação, situação
+    - _Requisitos: 22.1, 22.2, 22.3_
+  - [ ] 4.14 Implementar Organização > Quadro Lotacional > Manter Quadro Lotacional
+    - Adicionar submódulo Quadro Lotacional ao módulo Organização
+    - Criar função `mantQuadroLotacional()` com filtros por unidade/cargo/exercício, tabela grid com unidade/cargo/vagas autorizadas/vagas ocupadas/vagas disponíveis, botões Novo/Editar/Excluir, modal com campos unidade, cargo, vagas autorizadas
+    - _Requisitos: 23.1, 23.2, 23.3, 23.4_
+  - [ ] 4.15 Implementar Organização > Quadro Lotacional > Pesquisar Quadro Lotacional
+    - Criar função `pesquisarQuadroLotacional()` com filtros por órgão/unidade/cargo/exercício, tabela de resultados com vagas autorizadas/ocupadas/disponíveis, botão Exportar
+    - _Requisitos: 24.1, 24.2, 24.3_
+
+- [ ] 5. Checkpoint — Testar módulos Pessoa, Recadastramentos, Frequência e Organização
+  - Verificar que todas as funções JS estão definidas e chamadas corretamente pelo menu
+  - Confirmar que filtros, tabelas e modais renderizam sem erros no browser
+
+- [ ] 6. Módulo Processos
+  - [ ] 6.1 Implementar Processos > Atos Oficiais > Elaborar Atos Oficiais
+    - Adicionar módulo Processos com submódulo Atos Oficiais ao array `menu`
+    - Criar função `elaborarAtosOficiais()` com filtros por tipo/situação, tabela grid com número/tipo/data/ementa/situação, botões Novo/Editar/Visualizar, modal com campos tipo, número, data, ementa, texto do ato, servidores vinculados
+    - _Requisitos: 25.1, 25.2, 25.3, 25.4, 25.5_
+  - [ ] 6.2 Implementar Processos > Atos Oficiais > Manter Tipo de Ato Oficial
+    - Criar função `mantTipoAtoOficial()` com tabela grid com nome/situação, botões Novo/Editar/Inativar, modal com campos nome, modelo de texto, campos variáveis, situação
+    - _Requisitos: 26.1, 26.2, 26.3_
+  - [ ] 6.3 Implementar Processos > Atos Oficiais > Publicar Atos Oficiais
+    - Criar função `publicarAtosOficiais()` com filtros por tipo/período/servidor, tabela de atos em elaboração, botão Publicar com validação de campos obrigatórios, coluna situação atualizada para "Publicado"
+    - _Requisitos: 27.1, 27.2, 27.3, 27.4, 27.5_
+  - [ ] 6.4 Implementar Processos > Inclusões > Consultar Inclusões
+    - Adicionar submódulo Inclusões ao módulo Processos
+    - Criar função `consultarInclusoes()` com filtros por módulo/período/usuário/tipo, tabela grid com data/hora/usuário/módulo/descrição, botão Exportar
+    - _Requisitos: 28.1, 28.2, 28.3_
+
+- [ ] 7. Módulo Processo Seletivo
+  - [ ] 7.1 Implementar Processo Seletivo > Concurso > Solicitar Novo Concurso
+    - Adicionar módulo Processo Seletivo com submódulo Concurso ao array `menu`
+    - Criar função `solicitarConcurso()` com tabela de solicitações existentes com situação, botão Novo, modal com campos órgão, cargo, número de vagas, justificativa, situação
+    - _Requisitos: 29.1, 29.2, 29.3, 29.4_
+  - [ ] 7.2 Implementar Processo Seletivo > Concurso > Manter Edital
+    - Criar função `mantEdital()` com tabela de editais com número/data/concurso/situação, botões Novo/Editar/Publicar, modal com campos número, data de publicação, concurso, cargos/vagas, cronograma
+    - _Requisitos: 30.1, 30.2, 30.3, 30.4_
+  - [ ] 7.3 Implementar Processo Seletivo > Concurso > Importar Inscritos
+    - Criar função `importarInscritos()` com seletor de concurso/edital, área de upload de arquivo (CSV/planilha mockado), tabela de preview com resultado da importação, resumo de erros e total importado
+    - _Requisitos: 31.1, 31.2, 31.3, 31.4_
+  - [ ] 7.4 Implementar Processo Seletivo > Ingresso > Nomear Candidatos
+    - Adicionar submódulo Ingresso ao módulo Processo Seletivo
+    - Criar função `nomearCandidatos()` com filtros por concurso/cargo, tabela de candidatos aprovados com situação, botão Nomear, confirmação com geração de ato oficial
+    - _Requisitos: 32.1, 32.2, 32.3, 32.4_
+  - [ ] 7.5 Implementar Processo Seletivo > Ingresso > Registrar Posse
+    - Criar função `registrarPosse()` com filtros por candidato nomeado, tabela de nomeados aguardando posse, modal com campos candidato, data da posse, cargo, unidade de lotação
+    - _Requisitos: 33.1, 33.2, 33.3, 33.4_
+
+- [ ] 8. Módulo Vínculos
+  - [ ] 8.1 Implementar Vínculos > Cargo Efetivo > Manter Estrutura de Carreira
+    - Atualizar módulo Vínculos no array `menu` adicionando submódulo Cargo Efetivo com ação `mantEstruturaCarreira`
+    - Criar função `mantEstruturaCarreira()` com filtros por nome/órgão/vigência, tabela grid com nome/órgão/hierarquia/vigência/situação, botões Novo/Editar/Excluir, modal com campos nome, órgão, hierarquia, vigência inicial/final
+    - _Requisitos: 34.1, 34.2, 34.3, 34.4_
+  - [ ] 8.2 Implementar Vínculos > Cargo Efetivo > Manter Itens de Carreira
+    - Criar função `mantItensCarreira()` com filtros por grupo ocupacional/cargo/situação, tabela grid com grupo/cargo/nível/estrutura/situação, botões Novo/Editar/Inativar, modal com campos grupo ocupacional, cargo, nível, estrutura de carreira, situação
+    - _Requisitos: 35.1, 35.2, 35.3_
+  - [ ] 8.3 Implementar Vínculos > Cargo Comissionado > Manter Cargo em Comissão
+    - Adicionar submódulo Cargo Comissionado ao módulo Vínculos
+    - Criar função `mantCargoComissao()` com filtros por denominação/símbolo/órgão, tabela grid com denominação/símbolo/valor/órgão/situação, botões Novo/Editar/Inativar, modal com campos denominação, símbolo, valor, órgão, situação
+    - _Requisitos: 36.1, 36.2, 36.3, 36.4_
+  - [ ] 8.4 Implementar Vínculos > Cargo Comissionado > Exonerar Cargo
+    - Criar função `exonerarCargo()` com pesquisa de servidor ocupante, tabela de ocupantes de cargo em comissão, modal de exoneração com campos servidor, cargo, data de exoneração, resumo de efeitos financeiros se retroativo
+    - _Requisitos: 37.1, 37.2, 37.3, 37.4_
+  - [ ] 8.5 Implementar Vínculos > Vínculo > Manter Informações do Vínculo
+    - Adicionar submódulo Vínculo ao módulo Vínculos com ação `mantInfoVinculo`
+    - Criar função `mantInfoVinculo()` com pesquisa de servidor, abas: Dados do Vínculo (cargo/unidade/jornada/regime/situação) e Histórico de Alterações (data/responsável/motivo)
+    - _Requisitos: 38.1, 38.2, 38.3, 38.4_
+  - [ ] 8.6 Implementar Vínculos > Vínculo > Pesquisar Servidores
+    - Criar função `pesquisarServidores()` com filtros por nome/matrícula/CPF/cargo/unidade/situação, tabela grid com matrícula/nome/cargo/unidade/regime/situação, botões Ver Vínculo/Exportar
+    - _Requisitos: 39.1, 39.2, 39.3_
+  - [ ] 8.7 Implementar Vínculos > Dependente > Manter Dependentes
+    - Adicionar submódulo Dependente ao módulo Vínculos
+    - Criar função `mantDependentes()` com pesquisa de servidor, tabela de dependentes com nome/parentesco/nascimento/situação, botões Novo/Editar/Excluir, modal com campos nome, parentesco, data de nascimento, CPF, situação
+    - _Requisitos: 40.1, 40.2, 40.3, 40.4_
+
+- [ ] 9. Checkpoint — Testar módulos Processos, Processo Seletivo e Vínculos
+  - Verificar que todas as funções JS estão definidas e chamadas corretamente pelo menu
+  - Confirmar que filtros, tabelas e modais renderizam sem erros no browser
+
+- [ ] 10. Módulo Funcional
+  - [ ] 10.1 Implementar Funcional > Progressão > Manter Progressão Funcional
+    - Atualizar módulo Funcional no array `menu` adicionando submódulo Progressão com ação `mantProgressao`
+    - Criar função `mantProgressao()` com filtros por servidor/cargo/período, tabela grid com servidor/cargo/nível anterior/nível novo/data/situação, botões Novo/Editar/Excluir, modal com campos servidor, cargo, nível, data de progressão
+    - _Requisitos: 41.1, 41.2, 41.3_
+  - [ ] 10.2 Implementar Funcional > Progressão > Manter Transformação de Cargo/Enquadramento
+    - Criar função `mantTransformacaoCargo()` com filtros por servidor/cargo/período, tabela de transformações com cargo origem/cargo destino/data/situação, botões Novo/Editar/Excluir, modal com campos servidor, cargo origem, cargo destino, data, justificativa
+    - _Requisitos: 42.1, 42.2_
+  - [ ] 10.3 Implementar Funcional > Progressão > Retroativo de Progressão
+    - Criar função `retroativoProgressao()` com filtros por competência/servidor, tabela de progressões com efeito retroativo, botão Calcular Retroativo, resumo de valores a pagar
+    - _Requisitos: 43.1, 43.2_
+  - [ ] 10.4 Implementar Funcional > Frequência > Manter Frequência
+    - Adicionar submódulo Frequência ao módulo Funcional com ação `mantFrequenciaFuncional`
+    - Criar função `mantFrequenciaFuncional()` com filtros por servidor/competência/unidade, tabela grid com servidor/competência/dias trabalhados/faltas/situação, botões Novo/Editar/Fechar Frequência
+    - _Requisitos: 44.1, 44.2_
+  - [ ] 10.5 Implementar Funcional > Frequência > Emitir Folha de Frequência
+    - Criar função `emitirFolhaFrequencia()` com filtros por competência/unidade/servidor, botão Emitir, prévia da folha de frequência em formato tabular mockado
+    - _Requisitos: 45.1, 45.2_
+  - [ ] 10.6 Implementar Funcional > Jornada de Trabalho > Manter Jornada
+    - Adicionar submódulo Jornada de Trabalho ao módulo Funcional com ação `mantJornada`
+    - Criar função `mantJornada()` com tabela grid com descrição/carga horária/tipo/situação, botões Novo/Editar/Inativar, modal com campos descrição, carga horária semanal, tipo, horários de entrada/saída
+    - _Requisitos: 46.1, 46.2_
+
+- [ ] 11. Módulo Desenvolvimento
+  - [ ] 11.1 Implementar Desenvolvimento > Capacitação > Manter Eventos
+    - Atualizar módulo Desenvolvimento no array `menu` adicionando submódulo Capacitação com ação `mantEventosCapacitacao`
+    - Criar função `mantEventosCapacitacao()` com filtros por nome/período/situação, tabela grid com nome/data início/data fim/carga horária/vagas/situação, botões Novo/Editar/Excluir, modal com campos nome, período, carga horária, vagas, local, instrutor
+    - _Requisitos: 47.1, 47.2_
+  - [ ] 11.2 Implementar Desenvolvimento > Capacitação > Manter Participantes
+    - Criar função `mantParticipantes()` com seletor de evento, tabela de participantes com servidor/matrícula/situação/frequência, botões Incluir/Remover/Registrar Frequência
+    - _Requisitos: 48.1, 48.2_
+  - [ ] 11.3 Implementar Desenvolvimento > Capacitação > Emitir Certificados
+    - Criar função `emitirCertificados()` com seletor de evento, tabela de participantes aprovados, botão Emitir Certificado (individual e em lote), prévia do certificado mockada
+    - _Requisitos: 49.1, 49.2_
+  - [ ] 11.4 Implementar Desenvolvimento > Currículo > Manter Formação
+    - Adicionar submódulo Currículo ao módulo Desenvolvimento com ação `mantFormacao`
+    - Criar função `mantFormacao()` com pesquisa de servidor, tabela de formações com nível/curso/instituição/ano/situação, botões Novo/Editar/Excluir, modal com campos nível de escolaridade, curso, instituição, ano de conclusão
+    - _Requisitos: 50.1, 50.2_
+  - [ ] 11.5 Implementar Desenvolvimento > Currículo > Manter Experiência
+    - Criar função `mantExperiencia()` com pesquisa de servidor, tabela de experiências com empresa/cargo/período/situação, botões Novo/Editar/Excluir, modal com campos empresa, cargo, data início, data fim, descrição
+    - _Requisitos: 51.1, 51.2_
+
+- [ ] 12. Módulo Afastamentos
+  - [ ] 12.1 Implementar Afastamentos > Afastamentos > Manter Afastamentos
+    - Atualizar módulo Afastamentos no array `menu` com ação `mantAfastamentos`
+    - Criar função `mantAfastamentos()` com filtros por servidor/motivo/período/situação, tabela grid com servidor/motivo/data início/data fim/situação, botões Novo/Editar/Excluir, modal com campos servidor, motivo, data início, data fim, observação
+    - _Requisitos: 52.1, 52.2, 52.3_
+  - [ ] 12.2 Implementar Afastamentos > Afastamentos > Manter Motivos
+    - Criar função `mantMotivosAfastamento()` com tabela grid com descrição/tipo (temporário/definitivo)/situação, botões Novo/Editar/Inativar, modal com campos descrição, tipo, situação
+    - _Requisitos: 53.1, 53.2_
+  - [ ] 12.3 Implementar Afastamentos > Férias > Manter Férias
+    - Adicionar submódulo Férias ao módulo Afastamentos com ação `mantFerias`
+    - Criar função `mantFerias()` com filtros por servidor/exercício/situação, tabela grid com servidor/exercício/período aquisitivo/período de gozo/situação, botões Novo/Editar/Excluir, modal com campos servidor, exercício, data início, data fim, dias
+    - _Requisitos: 54.1, 54.2_
+  - [ ] 12.4 Implementar Afastamentos > Férias > Emitir Aviso
+    - Criar função `emitirAvisoFerias()` com filtros por servidor/período, tabela de férias programadas, botão Emitir Aviso de Férias, prévia do aviso mockada
+    - _Requisitos: 55.1, 55.2_
+
+- [ ] 13. Módulo Movimentação
+  - [ ] 13.1 Implementar Movimentação > Dentro do Agrupamento > Manter Movimentação
+    - Atualizar módulo Movimentação no array `menu` com ação `mantMovimentacao`
+    - Criar função `mantMovimentacao()` com filtros por servidor/instituto/motivo/período, tabela grid com servidor/unidade origem/unidade destino/data/situação, botões Novo/Editar/Excluir, modal com campos servidor, unidade origem, unidade destino, instituto, motivo, data
+    - _Requisitos: 56.1, 56.2_
+  - [ ] 13.2 Implementar Movimentação > Dentro do Agrupamento > Gerar Movimentações em Lote
+    - Criar função `gerarMovimentacoesLote()` com filtros por unidade/cargo/instituto, área de seleção múltipla de servidores, botão Gerar Lote, resumo de movimentações a processar
+    - _Requisitos: 57.1, 57.2_
+  - [ ] 13.3 Implementar Movimentação > Recebimento à Disposição > Receber Servidor
+    - Adicionar submódulo Recebimento à Disposição ao módulo Movimentação com ação `receberServidorDisposicao`
+    - Criar função `receberServidorDisposicao()` com pesquisa de servidor externo, tabela de servidores à disposição recebidos, modal com campos servidor, órgão de origem, data de início, data de término, ato de cessão
+    - _Requisitos: 58.1, 58.2_
+
+- [ ] 14. Checkpoint — Testar módulos Funcional, Desenvolvimento, Afastamentos e Movimentação
+  - Verificar que todas as funções JS estão definidas e chamadas corretamente pelo menu
+  - Confirmar que filtros, tabelas e modais renderizam sem erros no browser
+
+- [ ] 15. Módulo Vantagem Pecuniária
+  - [ ] 15.1 Implementar Vantagem Pecuniária > Gratificação > Manter Tipos de Gratificação
+    - Atualizar módulo Vantagem Pecuniária no array `menu` adicionando submódulo Gratificação com ação `mantTiposGratificacao`
+    - Criar função `mantTiposGratificacao()` com tabela grid com nome/base de cálculo/percentual/situação, botões Novo/Editar/Inativar, modal com campos nome, base de cálculo, percentual/valor, situação
+    - _Requisitos: 59.1, 59.2_
+  - [ ] 15.2 Implementar Vantagem Pecuniária > Gratificação > Manter Valores
+    - Criar função `mantValoresGratificacao()` com filtros por tipo/servidor/vigência, tabela grid com servidor/tipo/valor/vigência/situação, botões Novo/Editar/Excluir, modal com campos servidor, tipo de gratificação, valor, vigência
+    - _Requisitos: 60.1, 60.2_
+  - [ ] 15.3 Implementar Vantagem Pecuniária > ATS > Recalcular Períodos
+    - Adicionar submódulo ATS ao módulo Vantagem Pecuniária com ação `recalcularATS`
+    - Criar função `recalcularATS()` com filtros por servidor/competência, tabela de períodos de ATS com data início/data fim/percentual/situação, botão Recalcular, resumo do novo valor calculado
+    - _Requisitos: 61.1, 61.2_
+
+- [ ] 16. Módulo Direitos
+  - [ ] 16.1 Implementar Direitos > Decisão Judicial > Manter Pagamento
+    - Adicionar módulo Direitos com submódulo Decisão Judicial ao array `menu`
+    - Criar função `mantPagamentoDecisaoJudicial()` com filtros por servidor/processo/situação, tabela grid com servidor/processo/valor/competência/situação, botões Novo/Editar/Excluir, modal com campos servidor, número do processo, valor, competência, tipo de pagamento
+    - _Requisitos: 62.1, 62.2_
+  - [ ] 16.2 Implementar Direitos > Diárias > Manter Solicitação
+    - Adicionar submódulo Diárias ao módulo Direitos com ação `mantSolicitacaoDiaria`
+    - Criar função `mantSolicitacaoDiaria()` com filtros por servidor/período/situação, tabela grid com servidor/destino/período/valor/situação, botões Novo/Editar/Cancelar, modal com campos servidor, destino, data início, data fim, motivo, valor diária
+    - _Requisitos: 63.1, 63.2_
+
+- [ ] 17. Módulo Benefícios
+  - [ ] 17.1 Implementar Benefícios > Vale Transporte > Manter Pedido
+    - Adicionar módulo Benefícios com submódulo Vale Transporte ao array `menu`
+    - Criar função `mantPedidoVT()` com filtros por servidor/competência/situação, tabela grid com servidor/linha/valor/competência/situação, botões Novo/Editar/Cancelar, modal com campos servidor, linha de transporte, valor, competência
+    - _Requisitos: 64.1, 64.2_
+  - [ ] 17.2 Implementar Benefícios > Auxílio Creche > Manter Concessão
+    - Adicionar submódulo Auxílio Creche ao módulo Benefícios com ação `mantConcessaoCreche`
+    - Criar função `mantConcessaoCreche()` com filtros por servidor/dependente/situação, tabela grid com servidor/dependente/valor/vigência/situação, botões Novo/Editar/Cancelar, modal com campos servidor, dependente, valor, data início, data fim
+    - _Requisitos: 65.1, 65.2_
+
+- [ ] 18. Módulo Pagamentos
+  - [ ] 18.1 Implementar Pagamentos > Folha de Pagamento > Manter Cronograma
+    - Adicionar módulo Pagamentos com submódulo Folha de Pagamento ao array `menu`
+    - Criar função `mantCronogramaFolha()` com tabela de cronograma por competência com datas de processamento/pagamento/situação, botões Novo/Editar/Excluir, modal com campos competência, data de processamento, data de pagamento, tipo de folha
+    - _Requisitos: 66.1, 66.2_
+  - [ ] 18.2 Implementar Pagamentos > Processamento Coletivo > Processar Folha
+    - Adicionar submódulo Processamento Coletivo ao módulo Pagamentos com ação `processarFolha`
+    - Criar função `processarFolha()` com seletor de competência/tipo de folha/órgão, painel de status do processamento, botão Processar, tabela de resultado com total de servidores processados/erros
+    - _Requisitos: 67.1, 67.2_
+  - [ ] 18.3 Implementar Pagamentos > Contracheque > Emitir Contracheque
+    - Adicionar submódulo Contracheque ao módulo Pagamentos com ação `emitirContracheque`
+    - Criar função `emitirContracheque()` com filtros por servidor/competência, prévia do contracheque mockado com proventos/descontos/líquido, botão Emitir/Imprimir
+    - _Requisitos: 68.1, 68.2_
+  - [ ] 18.4 Implementar Pagamentos > Relatórios > Emitir Ficha Financeira
+    - Adicionar submódulo Relatórios ao módulo Pagamentos com ação `emitirFichaFinanceira`
+    - Criar função `emitirFichaFinanceira()` com filtros por servidor/exercício, tabela de histórico financeiro anual com competência/proventos/descontos/líquido, botão Emitir
+    - _Requisitos: 69.1, 69.2_
+
+- [ ] 19. Checkpoint — Testar módulos Vantagem Pecuniária, Direitos, Benefícios e Pagamentos
+  - Verificar que todas as funções JS estão definidas e chamadas corretamente pelo menu
+  - Confirmar que filtros, tabelas e modais renderizam sem erros no browser
+
+- [ ] 20. Módulo Saúde do Servidor
+  - [ ] 20.1 Implementar Saúde do Servidor > Perícia Médica > Manter Laudo
+    - Adicionar módulo Saúde do Servidor com submódulo Perícia Médica ao array `menu`
+    - Criar função `mantLaudoPericia()` com filtros por servidor/período/situação, tabela grid com servidor/data/médico perito/CID/situação, botões Novo/Editar/Excluir, modal com campos servidor, data, médico perito, CID, diagnóstico, dias de afastamento
+    - _Requisitos: 70.1, 70.2_
+  - [ ] 20.2 Implementar Saúde do Servidor > Acidentes > Registrar Comunicação
+    - Adicionar submódulo Acidentes ao módulo Saúde do Servidor com ação `registrarCAT`
+    - Criar função `registrarCAT()` com filtros por servidor/período/situação, tabela grid com servidor/data do acidente/tipo/situação, botão Novo, modal com campos servidor, data do acidente, local, descrição, testemunhas, tipo de acidente
+    - _Requisitos: 71.1, 71.2_
+
+- [ ] 21. Módulo Previdência
+  - [ ] 21.1 Implementar Previdência > Averbação > Manter Certidão
+    - Adicionar módulo Previdência com submódulo Averbação ao array `menu`
+    - Criar função `mantCertidaoAverbacao()` com filtros por servidor/tipo/situação, tabela grid com servidor/tipo de certidão/período/situação, botões Novo/Editar/Excluir, modal com campos servidor, tipo de certidão, período, órgão emissor, número
+    - _Requisitos: 72.1, 72.2_
+  - [ ] 21.2 Implementar Previdência > Recadastramento > Recadastrar Aposentados
+    - Adicionar submódulo Recadastramento ao módulo Previdência com ação `recadastrarAposentados`
+    - Criar função `recadastrarAposentados()` com filtros por situação/período, tabela de aposentados com nome/matrícula/situação/prazo, botões Validar/Rejeitar, modal de validação com dados do aposentado
+    - _Requisitos: 73.1, 73.2_
+
+- [ ] 22. Módulo Dados Gerenciais
+  - [ ] 22.1 Implementar Dados Gerenciais > Cubo > Informações Funcionais
+    - Adicionar módulo Dados Gerenciais com submódulo Cubo ao array `menu`
+    - Criar função `infoFuncionaisCubo()` com seletores de dimensões (órgão/cargo/unidade/período), tabela pivot mockada com totais por dimensão, botão Exportar
+    - _Requisitos: 74.1, 74.2_
+  - [ ] 22.2 Implementar Dados Gerenciais > Relatórios > Estatísticas
+    - Adicionar submódulo Relatórios ao módulo Dados Gerenciais com ação `estatisticasRH`
+    - Criar função `estatisticasRH()` com filtros por órgão/período/tipo de estatística, cards de totais mockados (total servidores/admissões/desligamentos/afastamentos), tabela de dados e botão Exportar
+    - _Requisitos: 75.1, 75.2_
+
+- [ ] 23. Módulo Segurança
+  - [ ] 23.1 Implementar Segurança > Usuários > Manter Acesso
+    - Adicionar módulo Segurança com submódulo Usuários ao array `menu`
+    - Criar função `mantAcessoUsuario()` com filtros por nome/login/perfil/situação, tabela grid com login/nome/perfil/último acesso/situação, botões Novo/Editar/Bloquear, modal com campos login, nome, e-mail, perfil, situação
+    - _Requisitos: 76.1, 76.2, 76.5_
+  - [ ] 23.2 Implementar Segurança > Perfis > Manter Perfil
+    - Adicionar submódulo Perfis ao módulo Segurança com ação `mantPerfil`
+    - Criar função `mantPerfil()` com tabela de perfis com nome/descrição/qtd usuários/situação, botões Novo/Editar/Inativar, modal com campos nome, descrição, situação e lista de funcionalidades vinculadas
+    - _Requisitos: 77.1, 77.2, 77.3_
+  - [ ] 23.3 Implementar Segurança > Funcionalidades > Manter Permissões
+    - Adicionar submódulo Funcionalidades ao módulo Segurança com ação `mantPermissoes`
+    - Criar função `mantPermissoes()` com seletor de perfil, árvore de módulos/funcionalidades com checkboxes de permissão (visualizar/incluir/editar/excluir), botão Salvar Permissões
+    - _Requisitos: 78.1, 78.2_
+
+- [ ] 24. Módulo eSocial
+  - [ ] 24.1 Implementar eSocial > Geração > Enviar Eventos
+    - Adicionar módulo eSocial com submódulo Geração ao array `menu`
+    - Criar função `enviarEventosESocial()` com filtros por tipo de evento/competência/situação, tabela grid com evento/competência/qtd registros/situação/data envio, botões Gerar/Enviar/Consultar Retorno
+    - _Requisitos: 79.1, 79.2_
+  - [ ] 24.2 Implementar eSocial > Eventos > S-2200
+    - Adicionar submódulo Eventos ao módulo eSocial com ação `eventoS2200`
+    - Criar função `eventoS2200()` com filtros por servidor/competência/situação, tabela de eventos S-2200 com servidor/data admissão/situação/data envio, botão Gerar S-2200, modal com dados do vínculo para o evento
+    - _Requisitos: 80.1, 80.2_
+  - [ ] 24.3 Implementar eSocial > Eventos > S-1200
+    - Criar função `eventoS1200()` com filtros por competência/situação, tabela de eventos S-1200 com servidor/competência/valor/situação, botão Gerar S-1200 (bloqueado se S-2200 pendente), indicador de dependência S-2200
+    - _Requisitos: 81.1, 81.2, 81.3_
+
+- [ ] 25. Módulo Serviços
+  - [ ] 25.1 Implementar Serviços > Agendador > Agendar Rotinas
+    - Adicionar módulo Serviços com submódulo Agendador ao array `menu`
+    - Criar função `agendarRotinas()` com tabela de rotinas agendadas com nome/frequência/próxima execução/última execução/situação, botões Novo/Editar/Ativar/Desativar, modal com campos nome, tipo de rotina, frequência, horário
+    - _Requisitos: 82.1, 82.2_
+  - [ ] 25.2 Implementar Serviços > Configuração > Parâmetros
+    - Adicionar submódulo Configuração ao módulo Serviços com ação `parametrosSistema`
+    - Criar função `parametrosSistema()` com abas por módulo (Frequência/Pagamento/Segurança/Geral), formulário de parâmetros com campos chave/valor/descrição, botão Salvar
+    - _Requisitos: 83.1, 83.2_
+
+- [ ] 26. Módulo Ajuda
+  - [ ] 26.1 Implementar Ajuda > Procedimentos Administrativos > Manter Procedimentos
+    - Adicionar módulo Ajuda com submódulo Procedimentos Administrativos ao array `menu`
+    - Criar função `mantProcedimentosAdm()` com filtros por título/módulo/situação, tabela grid com título/módulo/data atualização/situação, botões Novo/Editar/Excluir, modal com campos título, módulo, conteúdo (textarea), situação
+    - _Requisitos: 84.1, 84.2_
+  - [ ] 26.2 Implementar Ajuda > Procedimentos Computacionais > Manter Procedimentos
+    - Adicionar submódulo Procedimentos Computacionais ao módulo Ajuda com ação `mantProcedimentosComp`
+    - Criar função `mantProcedimentosComp()` com filtros por título/funcionalidade/situação, tabela grid com título/funcionalidade/data atualização/situação, botões Novo/Editar/Excluir, modal com campos título, funcionalidade, conteúdo (textarea), situação
+    - _Requisitos: 85.1, 85.2_
+
+- [ ] 27. Checkpoint final — Verificar integração completa
+  - Confirmar que todos os 85 itens do menu estão acessíveis e navegáveis
+  - Verificar que nenhuma função JS referenciada no menu está indefinida
+  - Testar abertura e fechamento de todos os modais
+  - Garantir que todos os módulos seguem os padrões visuais: `.page-title`, `.page-body`, `table.grid`, `.btn`, `.modal-overlay`
+
+## Notas
+
+- Tarefas marcadas com `*` são opcionais e podem ser puladas para MVP mais rápido
+- Cada tarefa referencia requisitos específicos para rastreabilidade
+- Checkpoints garantem validação incremental
+- Todo o código vai em `index.html` — sem arquivos externos, sem build
+- Usar dados mockados realistas em pt-BR para todas as tabelas
+- Funções já existentes no `menu` array (`validarRecadastramento`, `mantRecadastramento`, `vinculoEfetivo`, etc.) devem ser atualizadas, não duplicadas

@@ -181,10 +181,39 @@
     <span onclick="showHome()" title="Inicio"><i class="fa fa-home"></i></span>
     <span title="Configuracoes"><i class="fa fa-cog"></i></span>
     <span title="Calendario"><i class="fa fa-calendar"></i></span>
-    <span class="notif" title="Notificacoes"><i class="fa fa-bell"></i><span class="badge">5</span></span>
+    <span class="notif" title="Notificações" onclick="toggleSinoPopup(event)" id="header-sino" style="cursor:pointer;">
+      <i class="fa fa-bell"></i>
+      <span class="badge" id="header-notif-badge" style="display:none;">0</span>
+    </span>
     <span title="Mensagens"><i class="fa fa-envelope"></i></span>
   </div>
-  <div class="user-btn"><i class="fa fa-user"></i> PESSOA CENTRAL <i class="fa fa-caret-down"></i></div>
+
+  <!-- Popup de notificações do header -->
+  <div id="sino-popup" style="display:none;position:fixed;top:40px;right:120px;width:320px;background:#fff;border:1px solid #aabbd0;border-radius:3px;box-shadow:0 4px 16px rgba(0,0,0,0.25);z-index:9999;">
+    <div style="background:#5b83b2;color:#fff;padding:8px 12px;font-size:12px;font-weight:bold;display:flex;justify-content:space-between;align-items:center;">
+      <span><i class="fa fa-bell"></i> Notificações</span>
+      <span onclick="fecharSinoPopup()" style="cursor:pointer;font-size:14px;">&times;</span>
+    </div>
+    <div id="sino-popup-lista" style="max-height:300px;overflow-y:auto;"></div>
+    <div style="padding:6px 12px;border-top:1px solid #d0dce8;text-align:right;">
+      <span onclick="marcarTodasLidasHeader();fecharSinoPopup();" style="font-size:11px;color:#1a5aaa;cursor:pointer;">Marcar todas como lidas</span>
+    </div>
+  </div>
+  <div class="dropdown-wrap" style="position:relative;">
+    <div class="user-btn" onclick="toggleDropdown(event,'dd-user-switch')" style="cursor:pointer;">
+      <i class="fa fa-user"></i> <span id="header-user-nome">PESSOA CENTRAL</span> <i class="fa fa-caret-down"></i>
+    </div>
+    <div class="dropdown-menu" id="dd-user-switch" style="right:0;left:auto;min-width:220px;">
+      <a onclick="trocarUsuario('PESSOA CENTRAL')" id="dd-user-pc">
+        <span><i class="fa fa-headset"></i> PESSOA CENTRAL</span>
+        <span id="dd-user-pc-check" style="color:#27ae60;"><i class="fa fa-check"></i></span>
+      </a>
+      <a onclick="trocarUsuario('RODRIGO PIMENTEL')" id="dd-user-rp">
+        <span><i class="fa fa-user"></i> RODRIGO PIMENTEL</span>
+        <span id="dd-user-rp-check" style="display:none;color:#27ae60;"><i class="fa fa-check"></i></span>
+      </a>
+    </div>
+  </div>
 </div>
 
 <div id="layout">
@@ -318,6 +347,45 @@ function gerarRelatorioECP() {
 
 <script>
 var usuarioAtual = { nome: 'PESSOA CENTRAL', perfis: ['NUGESP'] };
+
+var usuariosPrototipo = {
+  'PESSOA CENTRAL': { nome: 'PESSOA CENTRAL', perfis: ['NUGESP'], tipo: 'suporte' },
+  'RODRIGO PIMENTEL': { nome: 'RODRIGO PIMENTEL', perfis: [], tipo: 'solicitante', area: 'NUGEP' }
+};
+
+function trocarUsuario(nome) {
+  var u = usuariosPrototipo[nome];
+  if (!u) return;
+  usuarioAtual = { nome: u.nome, perfis: u.perfis };
+
+  // Atualiza header
+  var headerNome = document.getElementById('header-user-nome');
+  if (headerNome) headerNome.textContent = u.nome;
+
+  // Atualiza checks no dropdown
+  var pcCheck = document.getElementById('dd-user-pc-check');
+  var rpCheck = document.getElementById('dd-user-rp-check');
+  if (pcCheck) pcCheck.style.display = nome === 'PESSOA CENTRAL' ? '' : 'none';
+  if (rpCheck) rpCheck.style.display = nome === 'RODRIGO PIMENTEL' ? '' : 'none';
+
+  // Fecha dropdown
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+
+  // Atualiza sino
+  atualizarSinoHeader();
+
+  // Mostra popup de notificações não lidas ao trocar
+  var naoLidas = notificacoesData.filter(function(n){ return !n.lida && n.destinatario === usuarioAtual.nome; });
+  if (naoLidas.length > 0) {
+    mostrarToastNotif('Você tem ' + naoLidas.length + ' notificação(ões) não lida(s).');
+  }
+
+  // Se estiver na Central de Chamados, recarrega
+  var content = document.getElementById('content');
+  if (content && content.innerHTML.indexOf('cc-content') >= 0) {
+    showCentralChamados();
+  }
+}
 var menu = [
   { label:'Recadastramentos', icon:'fa-sync-alt', sub:[
     { label:'Recadastramento', sub:[
@@ -711,7 +779,8 @@ var menu = [
       { label:'Manter Locais de Risco/Insalubridade' },
       { label:'Manter Atividades de Risco/Insalubridade' },
       { label:'Manter indicador de risco' },
-      { label:'Manter tipos de risco' }
+      { label:'Manter tipos de risco' },
+      { label:'Manter Condições Ambientais do Trabalho', action:'mantCondicoesAmbientais' }
     ]}
   ]},
   { label:'Previdencia', icon:'fa-umbrella', sub:[
@@ -866,6 +935,9 @@ var menu = [
     { label:'Procedimentos Computacionais', sub:[
       { label:'Manter procedimentos computacionais Biblioteca' },
       { label:'Manter procedimentos computacionais no agrupamento' }
+    ]},
+    { label:'Central de Chamados', sub:[
+      { label:'Manter Chamados', action:'centralChamados' }
     ]}
   ]},
   { label:'Suspensos', icon:'fa-ban', sub:[
@@ -1000,6 +1072,8 @@ function runAction(a) {
   if(a==='retificacaoEventos') showRetificacaoEventos();
   if(a==='gerirMatriculasEsocial') showGerirMatriculasEsocial();
   if(a==='geracaoEnvioEsocial') showGeracaoEnvioEsocial();
+  if(a==='centralChamados') showCentralChamados();
+  if(a==='mantCondicoesAmbientais') showMantCondicoesAmbientais();
 }
 
 function showHome() {
@@ -1299,6 +1373,121 @@ function filtrarPF(q) {
 }
 
 buildMenu();
+
+// ===== SINO / NOTIFICAÇÕES DO HEADER =====
+
+function atualizarSinoHeader() {
+  var naoLidas = notificacoesData ? notificacoesData.filter(function(n){
+    return !n.lida && n.destinatario === usuarioAtual.nome;
+  }) : [];
+  var badge = document.getElementById('header-notif-badge');
+  if (badge) {
+    if (naoLidas.length > 0) {
+      badge.style.display = 'flex';
+      badge.textContent = naoLidas.length;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+}
+
+function toggleSinoPopup(e) {
+  if (e) e.stopPropagation();
+  var popup = document.getElementById('sino-popup');
+  if (!popup) return;
+  if (popup.style.display !== 'none') {
+    popup.style.display = 'none';
+  } else {
+    renderizarSinoPopup();
+    popup.style.display = 'block';
+  }
+}
+
+function fecharSinoPopup() {
+  var popup = document.getElementById('sino-popup');
+  if (popup) popup.style.display = 'none';
+}
+
+function renderizarSinoPopup() {
+  var lista = document.getElementById('sino-popup-lista');
+  if (!lista || !notificacoesData) return;
+  var minhas = notificacoesData.filter(function(n){ return n.destinatario === usuarioAtual.nome; });
+  minhas = minhas.slice().sort(function(a,b){ return new Date(b.dataHora) - new Date(a.dataHora); });
+
+  if (!minhas.length) {
+    lista.innerHTML = '<div style="padding:14px;text-align:center;color:#888;font-size:11px;">Nenhuma notificação.</div>';
+    return;
+  }
+
+  var icones = {
+    'Chamado criado': 'fa-plus-circle',
+    'Chamado assumido': 'fa-user-check',
+    'Status alterado': 'fa-exchange-alt',
+    'Comentário adicionado': 'fa-comment',
+    'Chamado finalizado': 'fa-check-circle',
+    'Chamado cancelado': 'fa-times-circle',
+    'Chamado editado': 'fa-pencil-alt',
+    'Chamado excluído': 'fa-trash'
+  };
+
+  var html = '';
+  minhas.forEach(function(n) {
+    var bg = n.lida ? '#fff' : '#e8f4ff';
+    var icone = icones[n.tipo] || 'fa-bell';
+    var pad = function(x){ return x < 10 ? '0'+x : ''+x; };
+    var d = new Date(n.dataHora);
+    var dt = pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes());
+    html +=
+      '<div style="background:' + bg + ';padding:8px 12px;border-bottom:1px solid #e8eef4;display:flex;align-items:flex-start;gap:8px;cursor:pointer;" onclick="marcarLidaHeader(' + n.id + ')">' +
+        '<i class="fa ' + icone + '" style="color:#5b83b2;margin-top:2px;flex-shrink:0;"></i>' +
+        '<div style="flex:1;">' +
+          '<div style="font-size:11px;font-weight:' + (n.lida ? 'normal' : 'bold') + ';color:#2a4a6a;">' + n.tipo + ' — ' + n.chamadoId + '</div>' +
+          '<div style="font-size:10px;color:#7a9ab8;">' + dt + '</div>' +
+        '</div>' +
+        (!n.lida ? '<span style="width:8px;height:8px;background:#e74c3c;border-radius:50%;flex-shrink:0;margin-top:4px;display:inline-block;"></span>' : '') +
+      '</div>';
+  });
+  lista.innerHTML = html;
+}
+
+function marcarLidaHeader(id) {
+  for (var i = 0; i < notificacoesData.length; i++) {
+    if (notificacoesData[i].id === id) { notificacoesData[i].lida = true; break; }
+  }
+  atualizarSinoHeader();
+  renderizarSinoPopup();
+}
+
+function marcarTodasLidasHeader() {
+  if (!notificacoesData) return;
+  notificacoesData.forEach(function(n){
+    if (n.destinatario === usuarioAtual.nome) n.lida = true;
+  });
+  atualizarSinoHeader();
+}
+
+function mostrarToastNotif(msg) {
+  var existing = document.getElementById('toast-notif-header');
+  if (existing) existing.remove();
+  var toast = document.createElement('div');
+  toast.id = 'toast-notif-header';
+  toast.style.cssText = 'position:fixed;top:44px;right:16px;background:#5b83b2;color:#fff;padding:8px 16px 8px 12px;font-size:11px;border-radius:3px;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;gap:10px;z-index:9998;cursor:pointer;';
+  toast.innerHTML = '<i class="fa fa-bell"></i> ' + msg +
+    '<span onclick="event.stopPropagation();this.parentElement.remove();" style="margin-left:8px;font-size:14px;opacity:0.8;">&times;</span>';
+  toast.onclick = function(){ fecharSinoPopup(); toggleSinoPopup(); toast.remove(); };
+  document.body.appendChild(toast);
+  setTimeout(function(){ if(toast.parentElement) toast.remove(); }, 5000);
+}
+
+document.addEventListener('click', function(e) {
+  var popup = document.getElementById('sino-popup');
+  var sino = document.getElementById('header-sino');
+  if (popup && popup.style.display !== 'none') {
+    if (!popup.contains(e.target) && (!sino || !sino.contains(e.target))) {
+      popup.style.display = 'none';
+    }
+  }
+});
 
 function showVincularServidor() {
   showPage(
@@ -4308,6 +4497,2617 @@ function geBuscarXml() {
 function geImprimir() {
   alert('Relatório de eventos gerado.');
 }
+</script>
+
+<!-- ===== CENTRAL DE CHAMADOS — MODAIS ===== -->
+<div class="modal-overlay" id="modal-cc-assumir">
+  <div class="modal-box">
+    <div class="modal-title">
+      Assumir Chamado
+      <span class="close-btn" onclick="document.getElementById('modal-cc-assumir').classList.remove('open')"><i class="fa fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <div class="fg" style="margin-bottom:10px;">
+        <label class="req">Responsável</label>
+        <select id="cc-assumir-resp" style="width:100%">
+          <option value=""></option>
+          <option value="Evelen Silva">Evelen Silva</option>
+          <option value="Matheus Neto">Matheus Neto</option>
+          <option value="Raiane Rocha">Raiane Rocha</option>
+          <option value="Evelyn Fernandes">Evelyn Fernandes</option>
+        </select>
+      </div>
+      <div id="cc-assumir-erro" style="color:#c00;font-size:11px;display:none;">Selecione um responsável.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-blue" onclick="ccConfirmarAcao('assumir', window._ccModalId, {responsavel: document.getElementById('cc-assumir-resp').value})"><i class="fa fa-check"></i> Confirmar</button>
+      <button class="btn btn-gray" onclick="document.getElementById('modal-cc-assumir').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-cc-status">
+  <div class="modal-box">
+    <div class="modal-title">
+      Alterar Status
+      <span class="close-btn" onclick="document.getElementById('modal-cc-status').classList.remove('open')"><i class="fa fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <div class="fg" style="margin-bottom:10px;">
+        <label class="req">Novo Status</label>
+        <select id="cc-status-novo" style="width:100%">
+          <option value=""></option>
+        </select>
+      </div>
+      <div id="cc-status-erro" style="color:#c00;font-size:11px;display:none;">Selecione um status.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-blue" onclick="ccConfirmarAcao('status', window._ccModalId, {statusNovo: document.getElementById('cc-status-novo').value})"><i class="fa fa-check"></i> Confirmar</button>
+      <button class="btn btn-gray" onclick="document.getElementById('modal-cc-status').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-cc-comentario">
+  <div class="modal-box">
+    <div class="modal-title">
+      Adicionar Comentário
+      <span class="close-btn" onclick="document.getElementById('modal-cc-comentario').classList.remove('open')"><i class="fa fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <div class="fg" style="margin-bottom:10px;">
+        <label class="req">Comentário</label>
+        <textarea id="cc-coment-texto" style="width:100%;height:80px;font-size:11px;padding:4px 6px;border:1px solid #aabbd0;border-radius:2px;resize:vertical;"></textarea>
+      </div>
+      <div class="fg" style="margin-bottom:10px;">
+        <label class="req">Visibilidade</label>
+        <select id="cc-coment-visib" style="width:100%">
+          <option value="publico">Público</option>
+          <option value="interno">Interno</option>
+        </select>
+      </div>
+      <div id="cc-coment-erro" style="color:#c00;font-size:11px;display:none;">Digite um comentário.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-blue" onclick="ccConfirmarAcao('comentario', window._ccModalId, {texto: document.getElementById('cc-coment-texto').value, visibilidade: document.getElementById('cc-coment-visib').value})"><i class="fa fa-check"></i> Confirmar</button>
+      <button class="btn btn-gray" onclick="document.getElementById('modal-cc-comentario').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-cc-finalizar">
+  <div class="modal-box">
+    <div class="modal-title">
+      Finalizar Chamado
+      <span class="close-btn" onclick="document.getElementById('modal-cc-finalizar').classList.remove('open')"><i class="fa fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#1a3a5a;">Confirma a finalização deste chamado? Esta ação irá alterar o status para <strong>Finalizado</strong>.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-green" onclick="ccConfirmarAcao('finalizar', window._ccModalId, {})"><i class="fa fa-check"></i> Finalizar</button>
+      <button class="btn btn-gray" onclick="document.getElementById('modal-cc-finalizar').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-cc-cancelar">
+  <div class="modal-box">
+    <div class="modal-title">
+      Cancelar Chamado
+      <span class="close-btn" onclick="document.getElementById('modal-cc-cancelar').classList.remove('open')"><i class="fa fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#1a3a5a;">Confirma o cancelamento deste chamado? Esta ação irá alterar o status para <strong>Cancelado</strong>.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-red" onclick="ccConfirmarAcao('cancelar', window._ccModalId, {})"><i class="fa fa-times"></i> Cancelar Chamado</button>
+      <button class="btn btn-gray" onclick="document.getElementById('modal-cc-cancelar').classList.remove('open')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>// ===== CENTRAL DE CHAMADOS — DADOS SIMULADOS =====
+
+var chamadosData = [
+  {
+    id: 'CHM-001',
+    tipo: 'Acesso ao sistema',
+    urgencia: 'Alta',
+    area: 'NUGESP',
+    solicitante: 'João Silva',
+    responsavel: 'Evelen Silva',
+    status: 'Em análise',
+    descricao: 'Não consigo acessar o módulo de Vínculos. Aparece mensagem de permissão negada ao tentar abrir qualquer funcionalidade do módulo.',
+    dataAbertura: '2025-01-15T09:30:00',
+    dataAtualizacao: '2025-01-15T11:00:00',
+    anexos: [],
+    historico: [
+      { dataHora: '2025-01-15T09:30:00', usuario: 'João Silva', acao: 'Chamado aberto', statusAnterior: null, statusNovo: 'Novo', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-15T11:00:00', usuario: 'Evelen Silva', acao: 'Chamado assumido', statusAnterior: 'Novo', statusNovo: 'Em análise', visibilidade: 'publico', comentario: null }
+    ]
+  },
+  {
+    id: 'CHM-002',
+    tipo: 'Erro/Bug',
+    urgencia: 'Crítica',
+    area: 'NUGEP',
+    solicitante: 'Maria Santos',
+    responsavel: 'Matheus Neto',
+    status: 'Em tratamento',
+    descricao: 'O sistema apresenta erro 500 ao tentar processar a folha de pagamento do mês de janeiro. O erro ocorre de forma intermitente e impede o fechamento da folha.',
+    dataAbertura: '2025-01-14T08:00:00',
+    dataAtualizacao: '2025-01-15T14:30:00',
+    anexos: ['print_erro.png'],
+    historico: [
+      { dataHora: '2025-01-14T08:00:00', usuario: 'Maria Santos', acao: 'Chamado aberto', statusAnterior: null, statusNovo: 'Novo', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-14T09:30:00', usuario: 'Matheus Neto', acao: 'Chamado assumido', statusAnterior: 'Novo', statusNovo: 'Em análise', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-14T15:00:00', usuario: 'Matheus Neto', acao: 'Comentário adicionado', statusAnterior: null, statusNovo: null, visibilidade: 'interno', comentario: 'Identificado problema na procedure de cálculo. Necessário acesso ao banco de produção para análise mais detalhada. Aguardando liberação do DBA.' },
+      { dataHora: '2025-01-15T10:00:00', usuario: 'Matheus Neto', acao: 'Status alterado', statusAnterior: 'Em análise', statusNovo: 'Em tratamento', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-15T14:30:00', usuario: 'Matheus Neto', acao: 'Comentário adicionado', statusAnterior: null, statusNovo: null, visibilidade: 'publico', comentario: 'Identificamos a causa do erro e estamos aplicando a correção. Previsão de resolução: até o final do dia.' }
+    ]
+  },
+  {
+    id: 'CHM-003',
+    tipo: 'Dúvida',
+    urgencia: 'Baixa',
+    area: 'NUGED',
+    solicitante: 'Carlos Oliveira',
+    responsavel: null,
+    status: 'Novo',
+    descricao: 'Gostaria de saber como realizar o lançamento de horas extras no sistema. Não encontrei documentação sobre o procedimento correto.',
+    dataAbertura: '2025-01-16T10:15:00',
+    dataAtualizacao: '2025-01-16T10:15:00',
+    anexos: [],
+    historico: [
+      { dataHora: '2025-01-16T10:15:00', usuario: 'Carlos Oliveira', acao: 'Chamado aberto', statusAnterior: null, statusNovo: 'Novo', visibilidade: 'publico', comentario: null }
+    ]
+  },
+  {
+    id: 'CHM-004',
+    tipo: 'Solicitação de cadastro',
+    urgencia: 'Média',
+    area: 'NUGEF',
+    solicitante: 'Ana Costa',
+    responsavel: 'Raiane Rocha',
+    status: 'Aguardando validação',
+    descricao: 'Solicito o cadastro de novo servidor admitido por concurso público. Matrícula provisória já gerada pelo RH. Aguardo validação dos dados para liberação do acesso.',
+    dataAbertura: '2025-01-13T14:00:00',
+    dataAtualizacao: '2025-01-15T16:00:00',
+    anexos: ['documentos_servidor.pdf'],
+    historico: [
+      { dataHora: '2025-01-13T14:00:00', usuario: 'Ana Costa', acao: 'Chamado aberto', statusAnterior: null, statusNovo: 'Novo', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-13T16:30:00', usuario: 'Raiane Rocha', acao: 'Chamado assumido', statusAnterior: 'Novo', statusNovo: 'Em análise', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-14T09:00:00', usuario: 'Raiane Rocha', acao: 'Status alterado', statusAnterior: 'Em análise', statusNovo: 'Em tratamento', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-15T16:00:00', usuario: 'Raiane Rocha', acao: 'Encaminhado para validação', statusAnterior: 'Em tratamento', statusNovo: 'Aguardando validação', visibilidade: 'publico', comentario: null }
+    ]
+  },
+  {
+    id: 'CHM-005',
+    tipo: 'Outros',
+    urgencia: 'Média',
+    area: 'DIRAD',
+    solicitante: 'Pedro Lima',
+    responsavel: 'Evelyn Fernandes',
+    status: 'Finalizado',
+    descricao: 'Necessito de relatório consolidado de frequência do mês de dezembro para todos os servidores da DIRAD. Formato Excel.',
+    dataAbertura: '2025-01-10T08:30:00',
+    dataAtualizacao: '2025-01-12T17:00:00',
+    anexos: [],
+    historico: [
+      { dataHora: '2025-01-10T08:30:00', usuario: 'Pedro Lima', acao: 'Chamado aberto', statusAnterior: null, statusNovo: 'Novo', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-10T10:00:00', usuario: 'Evelyn Fernandes', acao: 'Chamado assumido', statusAnterior: 'Novo', statusNovo: 'Em análise', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-11T14:00:00', usuario: 'Evelyn Fernandes', acao: 'Status alterado', statusAnterior: 'Em análise', statusNovo: 'Em tratamento', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-12T17:00:00', usuario: 'Evelyn Fernandes', acao: 'Chamado finalizado', statusAnterior: 'Em tratamento', statusNovo: 'Finalizado', visibilidade: 'publico', comentario: null }
+    ]
+  },
+  {
+    id: 'CHM-006',
+    tipo: 'Acesso ao sistema',
+    urgencia: 'Alta',
+    area: 'SEAD',
+    solicitante: 'João Silva',
+    responsavel: 'Evelen Silva',
+    status: 'Cancelado',
+    descricao: 'Solicitação de redefinição de senha para acesso ao módulo de Pagamentos. Usuário bloqueado após 3 tentativas incorretas.',
+    dataAbertura: '2025-01-08T11:00:00',
+    dataAtualizacao: '2025-01-09T09:00:00',
+    anexos: [],
+    historico: [
+      { dataHora: '2025-01-08T11:00:00', usuario: 'João Silva', acao: 'Chamado aberto', statusAnterior: null, statusNovo: 'Novo', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-08T14:00:00', usuario: 'Evelen Silva', acao: 'Chamado assumido', statusAnterior: 'Novo', statusNovo: 'Em análise', visibilidade: 'publico', comentario: null },
+      { dataHora: '2025-01-09T09:00:00', usuario: 'João Silva', acao: 'Chamado cancelado', statusAnterior: 'Em análise', statusNovo: 'Cancelado', visibilidade: 'publico', comentario: null }
+    ]
+  }
+];
+
+var notificacoesData = [
+  { id: 1, tipo: 'Chamado criado', chamadoId: 'CHM-001', dataHora: '2025-01-15T09:30:00', lida: true, destinatario: 'PESSOA CENTRAL' },
+  { id: 2, tipo: 'Chamado assumido', chamadoId: 'CHM-001', dataHora: '2025-01-15T11:00:00', lida: true, destinatario: 'João Silva' },
+  { id: 3, tipo: 'Chamado criado', chamadoId: 'CHM-006', dataHora: '2025-01-08T11:00:00', lida: true, destinatario: 'PESSOA CENTRAL' },
+  { id: 4, tipo: 'Chamado assumido', chamadoId: 'CHM-006', dataHora: '2025-01-08T14:00:00', lida: true, destinatario: 'João Silva' },
+  { id: 5, tipo: 'Chamado cancelado', chamadoId: 'CHM-006', dataHora: '2025-01-09T09:00:00', lida: false, destinatario: 'João Silva' },
+  { id: 6, tipo: 'Status alterado', chamadoId: 'CHM-001', dataHora: '2025-01-15T11:00:00', lida: false, destinatario: 'João Silva' },
+  { id: 7, tipo: 'Comentário adicionado', chamadoId: 'CHM-001', dataHora: '2025-01-15T14:30:00', lida: false, destinatario: 'João Silva' }
+];
+
+var ccNotifIdCounter = 10;
+var ccPerfilAtivo = 'solicitante';
+var ccChamadoAtual = null;
+var ccChamadoIdCounter = 7;
+// ===== CENTRAL DE CHAMADOS — FUNÇÕES DE LÓGICA PURA =====
+
+function ccValidarFormulario(campos) {
+  return !!(campos.tipo && campos.tipo.trim() &&
+            campos.urgencia && campos.urgencia.trim() &&
+            campos.area && campos.area.trim() &&
+            campos.descricao && campos.descricao.trim());
+}
+
+function ccCorStatus(status) {
+  var estilos = {
+    'Novo':                 'background:#e8f0fb;color:#5b83b2;border:1px solid #5b83b2;',
+    'Em análise':           'background:#fff3cd;color:#856404;border:1px solid #ffc107;',
+    'Em tratamento':        'background:#fef9e7;color:#e67e22;border:1px solid #e67e22;',
+    'Aguardando validação': 'background:#f4ecf7;color:#6c3483;border:1px solid #6c3483;',
+    'Finalizado':           'background:#d4edda;color:#155724;border:1px solid #28a745;',
+    'Cancelado':            'background:#e2e3e5;color:#383d41;border:1px solid #6c757d;'
+  };
+  var estilo = estilos[status] || 'background:#eee;color:#333;border:1px solid #ccc;';
+  return '<span style="' + estilo + 'padding:2px 8px;border-radius:10px;font-size:10px;font-weight:bold;white-space:nowrap;">' + status + '</span>';
+}
+
+function ccOrdenarPorData(chamados) {
+  return chamados.slice().sort(function(a, b) {
+    return new Date(b.dataAbertura) - new Date(a.dataAbertura);
+  });
+}
+
+function ccFiltrarChamados(chamados, filtros) {
+  return chamados.filter(function(c) {
+    if (filtros.status && filtros.status.length > 0 && filtros.status.indexOf(c.status) === -1) return false;
+    if (filtros.urgencia && filtros.urgencia.length > 0 && filtros.urgencia.indexOf(c.urgencia) === -1) return false;
+    if (filtros.area && filtros.area.trim() && c.area !== filtros.area.trim()) return false;
+    if (filtros.solicitante && filtros.solicitante.trim() && c.solicitante.toLowerCase().indexOf(filtros.solicitante.trim().toLowerCase()) === -1) return false;
+    if (filtros.responsavel && filtros.responsavel.trim()) {
+      if (filtros.responsavel === '__sem__') {
+        if (c.responsavel) return false;
+      } else {
+        if (c.responsavel !== filtros.responsavel.trim()) return false;
+      }
+    }
+    return true;
+  });
+}
+
+function ccContarPorStatus(chamados) {
+  var contagem = {};
+  chamados.forEach(function(c) {
+    contagem[c.status] = (contagem[c.status] || 0) + 1;
+  });
+  return contagem;
+}
+
+function ccGerarNotificacao(tipo, chamadoId, destinatario) {
+  // Se não informado, notifica a Pessoa Central por padrão
+  var dest = destinatario || 'PESSOA CENTRAL';
+  notificacoesData.push({
+    id: ccNotifIdCounter++,
+    tipo: tipo,
+    chamadoId: chamadoId,
+    dataHora: new Date().toISOString(),
+    lida: false,
+    destinatario: dest
+  });
+  atualizarSinoHeader();
+}
+
+function ccMarcarLidas() {
+  notificacoesData.forEach(function(n) { n.lida = true; });
+}
+
+function ccFormatarDataHora(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+  return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+// ===== CENTRAL DE CHAMADOS — SELETOR DE PERFIL E ESTRUTURA BASE (Tarefa 5) =====
+
+function showCentralChamados() {
+  var u = usuariosPrototipo[usuarioAtual.nome] || usuariosPrototipo['PESSOA CENTRAL'];
+  ccPerfilAtivo = u.tipo === 'solicitante' ? 'solicitante' : 'suporte';
+  // Reseta estado da visão solicitante ao entrar na tela
+  ccSolEstado = 'inicio';
+  ccSolFiltros = { numero: '', status: '', tipo: '' };
+  ccSolLinhaSelecionada = null;
+  ccSupLinhaSelecionada = null;
+
+  var html =
+    '<div class="page-title"><i class="fa fa-headset"></i> Manter Chamados</div>' +
+    '<div class="page-body" style="padding:10px 14px;">' +
+      '<div id="cc-content"></div>' +
+    '</div>';
+  showPage(html);
+  ccRenderPerfil();
+}
+
+function ccSetPerfil(perfil) {
+  ccPerfilAtivo = perfil;
+  var btnSol = document.getElementById('cc-btn-solicitante');
+  var btnSup = document.getElementById('cc-btn-suporte');
+  if (btnSol && btnSup) {
+    if (perfil === 'solicitante') {
+      btnSol.className = 'btn btn-blue';
+      btnSup.className = 'btn btn-gray';
+    } else {
+      btnSol.className = 'btn btn-gray';
+      btnSup.className = 'btn btn-blue';
+    }
+  }
+  ccRenderPerfil();
+}
+
+function ccRenderPerfil() {
+  if (ccPerfilAtivo === 'solicitante') {
+    ccRenderSolicitante();
+  } else {
+    ccRenderSuporteAdmin();
+  }
+}
+// ===== CENTRAL DE CHAMADOS — VISÃO SOLICITANTE (Tarefa 6) =====
+
+// Estado da visão solicitante: 'inicio' | 'novo' | 'lista' | 'detalhe'
+var ccSolEstado = 'inicio';
+var ccSolFiltros = { numero: '', status: '', tipo: '' };
+
+function ccRenderSolicitante(estado, params) {
+  if (estado) ccSolEstado = estado;
+  if (params) ccSolFiltros = params;
+
+  var naoLidas = notificacoesData.filter(function(n){ return !n.lida && n.destinatario === usuarioAtual.nome; }).length;
+
+  // Seção de filtros
+  var filtrosHtml =
+    '<div class="alt-section" style="margin-bottom:10px;">' +
+      '<div class="alt-sec-title"><i class="fa fa-filter"></i> Filtros</div>' +
+      '<div class="alt-body">' +
+        '<div class="frow">' +
+          '<div class="fg">' +
+            '<label>Número</label>' +
+            '<input type="text" id="cc-sol-filtro-num" style="width:100px;font-size:11px;" placeholder="CHM-..." value="' + (ccSolFiltros.numero || '') + '"/>' +
+          '</div>' +
+          '<div class="fg">' +
+            '<label>Status</label>' +
+            '<select id="cc-sol-filtro-status" style="width:160px;font-size:11px;">' +
+              '<option value="">Todos</option>' +
+              '<option value="Novo"' + (ccSolFiltros.status==='Novo'?' selected':'') + '>Novo</option>' +
+              '<option value="Em análise"' + (ccSolFiltros.status==='Em análise'?' selected':'') + '>Em análise</option>' +
+              '<option value="Em tratamento"' + (ccSolFiltros.status==='Em tratamento'?' selected':'') + '>Em tratamento</option>' +
+              '<option value="Aguardando validação"' + (ccSolFiltros.status==='Aguardando validação'?' selected':'') + '>Aguardando validação</option>' +
+              '<option value="Finalizado"' + (ccSolFiltros.status==='Finalizado'?' selected':'') + '>Finalizado</option>' +
+              '<option value="Cancelado"' + (ccSolFiltros.status==='Cancelado'?' selected':'') + '>Cancelado</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="fg">' +
+            '<label>Tipo</label>' +
+            '<select id="cc-sol-filtro-tipo" style="width:180px;font-size:11px;">' +
+              '<option value="">Todos</option>' +
+              '<option value="Acesso ao sistema"' + (ccSolFiltros.tipo==='Acesso ao sistema'?' selected':'') + '>Acesso ao sistema</option>' +
+              '<option value="Dúvida"' + (ccSolFiltros.tipo==='Dúvida'?' selected':'') + '>Dúvida</option>' +
+              '<option value="Erro/Bug"' + (ccSolFiltros.tipo==='Erro/Bug'?' selected':'') + '>Erro/Bug</option>' +
+              '<option value="Solicitação de cadastro"' + (ccSolFiltros.tipo==='Solicitação de cadastro'?' selected':'') + '>Solicitação de cadastro</option>' +
+              '<option value="Outros"' + (ccSolFiltros.tipo==='Outros'?' selected':'') + '>Outros</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="fg" style="justify-content:flex-end;">' +
+            '<label>&nbsp;</label>' +
+            '<div style="display:flex;gap:4px;">' +
+              '<button class="btn btn-blue" onclick="ccSolPesquisar()"><i class="fa fa-search"></i> Pesquisar</button>' +
+              '<button class="btn btn-gray" onclick="ccSolLimparFiltros()"><i class="fa fa-times"></i> Limpar</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  // Action bar
+  var actionBarHtml =
+    '<div class="action-bar" style="margin-bottom:10px;">' +
+      '<button class="btn btn-green" onclick="ccSolMostrarNovo()"><i class="fa fa-plus"></i> Novo</button>' +
+      '<button class="btn btn-blue" onclick="ccSolPesquisar()"><i class="fa fa-list"></i> Listar</button>' +
+      '<button class="btn btn-gray" onclick="ccSolImprimir()"><i class="fa fa-print"></i> Imprimir</button>' +
+      '<button class="btn btn-red" onclick="ccSolOpcaoExcluir()" id="cc-sol-btn-excluir" style="display:' + (ccSolEstado === 'lista' ? 'inline-block' : 'none') + ';"><i class="fa fa-trash"></i> Excluir</button>' +
+      '<div class="spacer" style="flex:1;"></div>' +
+      '<div class="dropdown-wrap" id="cc-sol-opcoes-wrap" style="display:' + (ccSolEstado === 'lista' ? 'inline-block' : 'none') + ';">' +
+        '<button class="btn btn-gray" onclick="toggleDropdown(event,\'cc-sol-dd-opcoes\')"><i class="fa fa-bars"></i> +Opções <i class="fa fa-caret-down"></i></button>' +
+        '<div class="dropdown-menu" id="cc-sol-dd-opcoes">' +
+          '<a onclick="ccSolOpcaoVisualizar()"><i class="fa fa-eye" style="margin-right:6px;"></i> Visualizar Chamado</a>' +
+          '<a onclick="ccSolOpcaoAlterar()"><i class="fa fa-pencil-alt" style="margin-right:6px;"></i> Alterar</a>' +
+          '<a onclick="ccSolOpcaoComentario()"><i class="fa fa-comment" style="margin-right:6px;"></i> Adicionar Comentário</a>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-left:10px;font-size:11px;color:#7a9ab8;">' +
+        (naoLidas > 0 ? '<span style="background:#e74c3c;color:#fff;border-radius:10px;padding:2px 8px;cursor:pointer;" onclick="ccSolMostrarNotificacoes()"><i class="fa fa-bell"></i> ' + naoLidas + ' notificação(ões)</span>' : '') +
+      '</div>' +
+    '</div>';
+
+  var corpoHtml = '';
+
+  if (ccSolEstado === 'lista') {
+    corpoHtml = ccRenderListaChamadosHtml();
+  } else if (ccSolEstado === 'notif') {
+    corpoHtml = ccRenderNotificacoesHtml();
+    ccMarcarLidas();
+    atualizarSinoHeader();
+  } else {
+    // Estado inicial: mostra mensagem de boas-vindas
+    corpoHtml =
+      '<div style="padding:30px;text-align:center;color:#7a9ab8;font-size:12px;">' +
+        '<i class="fa fa-headset" style="font-size:32px;display:block;margin-bottom:10px;color:#5b83b2;"></i>' +
+        '<strong style="color:#2a4a6a;font-size:13px;">Central de Chamados</strong><br>' +
+        '<span>Clique em <strong>Listar</strong> para ver seus chamados ou <strong>Novo</strong> para abrir um chamado.</span>' +
+      '</div>';
+  }
+
+  var html =
+    '<div style="display:flex;flex-direction:column;">' +
+      filtrosHtml +
+      actionBarHtml +
+      '<div id="cc-sol-corpo">' + corpoHtml + '</div>' +
+    '</div>';
+
+  var area = document.getElementById('cc-content');
+  if (area) area.innerHTML = html;
+}
+
+function ccSolRenderFormNovo() {
+  return (
+    '<div class="alt-section">' +
+      '<div class="alt-sec-title"><i class="fa fa-plus"></i> Novo Chamado</div>' +
+      '<div class="alt-body">' +
+        '<div class="frow">' +
+          '<div class="fg" id="fg-tipo">' +
+            '<label class="req">Tipo da Solicitação</label>' +
+            '<select id="cc-tipo" style="width:220px" onchange="ccLimparErro(\'fg-tipo\')">' +
+              '<option value=""></option>' +
+              '<option>Acesso ao sistema</option>' +
+              '<option>Dúvida</option>' +
+              '<option>Erro/Bug</option>' +
+              '<option>Solicitação de cadastro</option>' +
+              '<option>Outros</option>' +
+            '</select>' +
+            '<span id="err-tipo" style="color:#c00;font-size:11px;display:none;">Campo obrigatório.</span>' +
+          '</div>' +
+          '<div class="fg" id="fg-urgencia">' +
+            '<label class="req">Nível de Urgência</label>' +
+            '<select id="cc-urgencia" style="width:160px" onchange="ccLimparErro(\'fg-urgencia\')">' +
+              '<option value=""></option>' +
+              '<option>Baixa</option>' +
+              '<option>Média</option>' +
+              '<option>Alta</option>' +
+              '<option>Crítica</option>' +
+            '</select>' +
+            '<span id="err-urgencia" style="color:#c00;font-size:11px;display:none;">Campo obrigatório.</span>' +
+          '</div>' +
+          '<div class="fg" id="fg-area">' +
+            '<label class="req">Área do Usuário</label>' +
+            '<select id="cc-area" style="width:160px" onchange="ccLimparErro(\'fg-area\')">' +
+              '<option value=""></option>' +
+              '<option>NUGESP</option>' +
+              '<option>NUGEP</option>' +
+              '<option>NUGED</option>' +
+              '<option>NUGEF</option>' +
+              '<option>DIRAD</option>' +
+              '<option>SEAD</option>' +
+            '</select>' +
+            '<span id="err-area" style="color:#c00;font-size:11px;display:none;">Campo obrigatório.</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="frow">' +
+          '<div class="fg" id="fg-descricao" style="flex:1;">' +
+            '<label class="req">Descrição</label>' +
+            '<textarea id="cc-descricao" style="width:100%;height:80px;font-size:11px;padding:4px 6px;border:1px solid #aabbd0;border-radius:2px;resize:vertical;" oninput="ccLimparErro(\'fg-descricao\')"></textarea>' +
+            '<span id="err-descricao" style="color:#c00;font-size:11px;display:none;">Campo obrigatório.</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="frow">' +
+          '<div class="fg">' +
+            '<label>Anexos</label>' +
+            '<input type="file" id="cc-anexos" multiple style="font-size:11px;"/>' +
+          '</div>' +
+        '</div>' +
+        '<div id="cc-form-msg" style="display:none;margin-top:8px;"></div>' +
+        '<div class="alt-actions">' +
+          '<button class="btn btn-green" onclick="ccAbrirChamado()"><i class="fa fa-paper-plane"></i> Enviar Chamado</button>' +
+          '<button class="btn btn-gray" onclick="ccLimparFormulario()"><i class="fa fa-eraser"></i> Limpar</button>' +
+          '<button class="btn btn-gray" onclick="ccRenderSolicitante(\'lista\')"><i class="fa fa-arrow-left"></i> Voltar</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function ccSolMostrarNovo() {
+  // Abre nova tela para criar chamado
+  showPage(
+    '<div class="page-title"><i class="fa fa-plus-circle"></i> Novo Chamado</div>' +
+    '<div class="page-body">' +
+    '<div class="alt-section">' +
+      '<div class="alt-sec-title">Dados do Chamado</div>' +
+      '<div class="alt-body">' +
+        '<div class="frow">' +
+          '<div class="fg" id="fg-tipo">' +
+            '<label class="req">Tipo da Solicitação</label>' +
+            '<select id="cc-tipo" style="width:220px" onchange="ccLimparErro(\'fg-tipo\')">' +
+              '<option value=""></option>' +
+              '<option>Acesso ao sistema</option>' +
+              '<option>Dúvida</option>' +
+              '<option>Erro/Bug</option>' +
+              '<option>Solicitação de cadastro</option>' +
+              '<option>Outros</option>' +
+            '</select>' +
+            '<span id="err-tipo" style="color:#c00;font-size:11px;display:none;">Campo obrigatório.</span>' +
+          '</div>' +
+          '<div class="fg" id="fg-urgencia">' +
+            '<label class="req">Nível de Urgência</label>' +
+            '<select id="cc-urgencia" style="width:160px" onchange="ccLimparErro(\'fg-urgencia\')">' +
+              '<option value=""></option>' +
+              '<option>Baixa</option>' +
+              '<option>Média</option>' +
+              '<option>Alta</option>' +
+              '<option>Crítica</option>' +
+            '</select>' +
+            '<span id="err-urgencia" style="color:#c00;font-size:11px;display:none;">Campo obrigatório.</span>' +
+          '</div>' +
+          '<div class="fg" id="fg-area">' +
+            '<label class="req">Área do Usuário</label>' +
+            '<select id="cc-area" style="width:160px" onchange="ccLimparErro(\'fg-area\')">' +
+              '<option value=""></option>' +
+              '<option>NUGESP</option>' +
+              '<option>NUGEP</option>' +
+              '<option>NUGED</option>' +
+              '<option>NUGEF</option>' +
+              '<option>DIRAD</option>' +
+              '<option>SEAD</option>' +
+            '</select>' +
+            '<span id="err-area" style="color:#c00;font-size:11px;display:none;">Campo obrigatório.</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="frow">' +
+          '<div class="fg" id="fg-descricao" style="flex:1;">' +
+            '<label class="req">Descrição</label>' +
+            '<textarea id="cc-descricao" style="width:100%;height:100px;font-size:11px;padding:4px 6px;border:1px solid #aabbd0;border-radius:2px;resize:vertical;" oninput="ccLimparErro(\'fg-descricao\')"></textarea>' +
+            '<span id="err-descricao" style="color:#c00;font-size:11px;display:none;">Campo obrigatório.</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="frow">' +
+          '<div class="fg">' +
+            '<label>Anexos</label>' +
+            '<input type="file" id="cc-anexos" multiple style="font-size:11px;"/>' +
+          '</div>' +
+        '</div>' +
+        '<div id="cc-form-msg" style="display:none;margin-top:8px;"></div>' +
+        '<div class="req-note">* Preenchimento obrigatório</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="alt-actions">' +
+      '<button class="btn btn-green" onclick="ccAbrirChamado()"><i class="fa fa-paper-plane"></i> Enviar Chamado</button>' +
+      '<button class="btn btn-gray" onclick="showCentralChamados()"><i class="fa fa-arrow-left"></i> Voltar</button>' +
+    '</div>' +
+    '</div>'
+  );
+}
+
+function ccSolPesquisar() {
+  var num = (document.getElementById('cc-sol-filtro-num') || {value:''}).value.trim().toUpperCase();
+  var status = (document.getElementById('cc-sol-filtro-status') || {value:''}).value;
+  var tipo = (document.getElementById('cc-sol-filtro-tipo') || {value:''}).value;
+  ccSolFiltros = { numero: num, status: status, tipo: tipo };
+  ccSolEstado = 'lista';
+  var corpo = document.getElementById('cc-sol-corpo');
+  if (corpo) corpo.innerHTML = ccRenderListaChamadosHtml();
+  // Mostra +Opções e Excluir
+  var opcWrap = document.getElementById('cc-sol-opcoes-wrap');
+  if (opcWrap) opcWrap.style.display = 'inline-block';
+  var btnExcluir = document.getElementById('cc-sol-btn-excluir');
+  if (btnExcluir) btnExcluir.style.display = 'inline-block';
+}
+
+function ccSolLimparFiltros() {
+  ccSolFiltros = { numero: '', status: '', tipo: '' };
+  var num = document.getElementById('cc-sol-filtro-num');
+  if (num) num.value = '';
+  var st = document.getElementById('cc-sol-filtro-status');
+  if (st) st.value = '';
+  var tp = document.getElementById('cc-sol-filtro-tipo');
+  if (tp) tp.value = '';
+  if (ccSolEstado === 'lista') {
+    var corpo = document.getElementById('cc-sol-corpo');
+    if (corpo) corpo.innerHTML = ccRenderListaChamadosHtml();
+  }
+}
+
+function ccSolImprimir() {
+  window.print();
+}
+
+function ccSolMostrarNotificacoes() {
+  ccSolEstado = 'notif';
+  var corpo = document.getElementById('cc-sol-corpo');
+  if (corpo) {
+    corpo.innerHTML = ccRenderNotificacoesHtml();
+    ccMarcarLidas();
+    atualizarSinoHeader();
+  }
+  var opcWrap = document.getElementById('cc-sol-opcoes-wrap');
+  if (opcWrap) opcWrap.style.display = 'none';
+}
+
+// Variável para rastrear linha selecionada na lista do solicitante
+var ccSolLinhaSelecionada = null;
+
+function ccSolSelecionarLinha(id) {
+  ccSolLinhaSelecionada = id;
+  // Destaca linha selecionada
+  var rows = document.querySelectorAll('#cc-sol-corpo table.grid tbody tr');
+  rows.forEach(function(r) {
+    r.classList.remove('selected');
+    if (r.getAttribute('data-id') === id) r.classList.add('selected');
+  });
+}
+
+function ccSolOpcaoVisualizar() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  if (!ccSolLinhaSelecionada) {
+    alert('Selecione um chamado na lista antes de usar esta opção.');
+    return;
+  }
+  ccRenderDetalhe(ccSolLinhaSelecionada, 'solicitante');
+}
+
+function ccSolOpcaoExcluir() {
+  if (!ccSolLinhaSelecionada) {
+    alert('Selecione um chamado na lista antes de excluir.');
+    return;
+  }
+  ccExcluirChamado(ccSolLinhaSelecionada);
+}
+
+function ccSolOpcaoAlterar() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  if (!ccSolLinhaSelecionada) {
+    alert('Selecione um chamado na lista antes de usar esta opção.');
+    return;
+  }
+  ccAbrirEditarChamado(ccSolLinhaSelecionada);
+}
+
+function ccSolOpcaoComentario() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  if (!ccSolLinhaSelecionada) {
+    alert('Selecione um chamado na lista antes de usar esta opção.');
+    return;
+  }
+  ccAbrirComentarSolicitante(ccSolLinhaSelecionada);
+}
+
+function ccSwitchTab(el, id) {
+  var container = el.parentElement;
+  container.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+  el.classList.add('active');
+  var parent = container.parentElement;
+  parent.querySelectorAll('.tab-body').forEach(function(b){ b.classList.remove('active'); });
+  var body = document.getElementById(id);
+  if (body) {
+    body.classList.add('active');
+    if (id === 'cc-tab-meus') {
+      var listaArea = document.getElementById('cc-lista-area');
+      if (listaArea) listaArea.innerHTML = ccRenderListaChamadosHtml();
+    }
+    if (id === 'cc-tab-notif') {
+      var notifArea = document.getElementById('cc-notif-area');
+      if (notifArea) {
+        notifArea.innerHTML = ccRenderNotificacoesHtml();
+        ccMarcarLidas();
+        var tabNotif = container.querySelector('.tab:nth-child(3)');
+        if (tabNotif) tabNotif.innerHTML = '<i class="fa fa-bell"></i> Notificações';
+      }
+    }
+  }
+}
+
+function ccLimparErro(fgId) {
+  var fg = document.getElementById(fgId);
+  if (!fg) return;
+  var input = fg.querySelector('select,textarea,input');
+  if (input) input.style.borderColor = '';
+  var span = fg.querySelector('span[id^="err-"]');
+  if (span) span.style.display = 'none';
+}
+
+function ccLimparFormulario() {
+  ['cc-tipo','cc-urgencia','cc-area'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  var desc = document.getElementById('cc-descricao');
+  if (desc) desc.value = '';
+  var anexos = document.getElementById('cc-anexos');
+  if (anexos) anexos.value = '';
+  ['fg-tipo','fg-urgencia','fg-area','fg-descricao'].forEach(ccLimparErro);
+  var msg = document.getElementById('cc-form-msg');
+  if (msg) { msg.style.display = 'none'; msg.innerHTML = ''; }
+}
+
+function ccAbrirChamado() {
+  var tipo = document.getElementById('cc-tipo') ? document.getElementById('cc-tipo').value : '';
+  var urgencia = document.getElementById('cc-urgencia') ? document.getElementById('cc-urgencia').value : '';
+  var area = document.getElementById('cc-area') ? document.getElementById('cc-area').value : '';
+  var descricao = document.getElementById('cc-descricao') ? document.getElementById('cc-descricao').value : '';
+  var anexosEl = document.getElementById('cc-anexos');
+  var campos = { tipo: tipo, urgencia: urgencia, area: area, descricao: descricao };
+  var valido = ccValidarFormulario(campos);
+
+  // Destacar campos inválidos
+  var camposConfig = [
+    { campo: 'tipo', fgId: 'fg-tipo', errId: 'err-tipo' },
+    { campo: 'urgencia', fgId: 'fg-urgencia', errId: 'err-urgencia' },
+    { campo: 'area', fgId: 'fg-area', errId: 'err-area' },
+    { campo: 'descricao', fgId: 'fg-descricao', errId: 'err-descricao' }
+  ];
+  camposConfig.forEach(function(cfg) {
+    var fg = document.getElementById(cfg.fgId);
+    var input = fg ? fg.querySelector('select,textarea') : null;
+    var span = document.getElementById(cfg.errId);
+    if (!campos[cfg.campo] || !campos[cfg.campo].trim()) {
+      if (input) input.style.borderColor = '#c00';
+      if (span) span.style.display = 'block';
+    } else {
+      if (input) input.style.borderColor = '';
+      if (span) span.style.display = 'none';
+    }
+  });
+
+  if (!valido) {
+    var msg = document.getElementById('cc-form-msg');
+    if (msg) {
+      msg.style.display = 'block';
+      msg.innerHTML = '<div style="background:#f8d7da;border:1px solid #f5c6cb;color:#721c24;padding:8px 12px;border-radius:2px;font-size:11px;"><i class="fa fa-exclamation-triangle"></i> Preencha todos os campos obrigatórios antes de enviar.</div>';
+    }
+    return;
+  }
+
+  // Criar chamado
+  var num = ccChamadoIdCounter < 10 ? '00' + ccChamadoIdCounter : (ccChamadoIdCounter < 100 ? '0' + ccChamadoIdCounter : '' + ccChamadoIdCounter);
+  var id = 'CHM-' + num;
+  ccChamadoIdCounter++;
+  var agora = new Date().toISOString();
+  var anexos = [];
+  if (anexosEl && anexosEl.files) {
+    for (var i = 0; i < anexosEl.files.length; i++) anexos.push(anexosEl.files[i].name);
+  }
+  var novoChamado = {
+    id: id,
+    tipo: tipo,
+    urgencia: urgencia,
+    area: area,
+    solicitante: usuarioAtual.nome,
+    responsavel: null,
+    status: 'Novo',
+    descricao: descricao,
+    dataAbertura: agora,
+    dataAtualizacao: agora,
+    anexos: anexos,
+    historico: [
+      { dataHora: agora, usuario: usuarioAtual.nome, acao: 'Chamado aberto', statusAnterior: null, statusNovo: 'Novo', visibilidade: 'publico', comentario: null }
+    ]
+  };
+  chamadosData.push(novoChamado);
+  // Notifica a Pessoa Central que um novo chamado foi criado
+  ccGerarNotificacao('Chamado criado', id, 'PESSOA CENTRAL');
+
+  // Exibir confirmação e reiniciar tela (volta para listagem)
+  ccSolEstado = 'lista';
+  ccSolFiltros = { numero: '', status: '', tipo: '' };
+  ccRenderSolicitante('lista');
+  // Mostra mensagem de sucesso no topo do corpo
+  var corpo = document.getElementById('cc-sol-corpo');
+  if (corpo) {
+    corpo.innerHTML =
+      '<div style="background:#d4edda;border:1px solid #c3e6cb;color:#155724;padding:10px 14px;border-radius:2px;font-size:12px;margin-bottom:10px;"><i class="fa fa-check-circle"></i> <strong>Chamado ' + id + ' aberto com sucesso!</strong> Acompanhe o andamento na listagem abaixo.</div>' +
+      ccRenderListaChamadosHtml();
+  }
+}
+// ===== CENTRAL DE CHAMADOS — LISTA E DETALHE (Tarefa 7) =====
+
+function ccRenderListaChamadosHtml() {
+  var nomeUsuario = usuarioAtual.nome;
+  var meusChamados = chamadosData.filter(function(c){ return c.solicitante === nomeUsuario; });
+
+  // Aplica filtros do solicitante
+  if (ccSolFiltros.numero) {
+    meusChamados = meusChamados.filter(function(c){ return c.id.toUpperCase().indexOf(ccSolFiltros.numero) >= 0; });
+  }
+  if (ccSolFiltros.status) {
+    meusChamados = meusChamados.filter(function(c){ return c.status === ccSolFiltros.status; });
+  }
+  if (ccSolFiltros.tipo) {
+    meusChamados = meusChamados.filter(function(c){ return c.tipo === ccSolFiltros.tipo; });
+  }
+
+  var ordenados = ccOrdenarPorData(meusChamados);
+  if (!ordenados.length) {
+    return '<div style="padding:20px;text-align:center;color:#888;font-size:12px;"><i class="fa fa-inbox" style="font-size:24px;display:block;margin-bottom:8px;"></i>Nenhum chamado encontrado.</div>';
+  }
+  var html = '<table class="grid"><thead><tr>' +
+    '<th>Número</th><th>Tipo</th><th>Urgência</th><th>Área</th><th>Status</th><th>Data de Abertura</th><th>Última Atualização</th>' +
+    '</tr></thead><tbody>';
+  ordenados.forEach(function(c) {
+    html += '<tr data-id="' + c.id + '" onclick="ccSolSelecionarLinha(\'' + c.id + '\')" style="cursor:pointer;">' +
+      '<td>' + c.id + '</td>' +
+      '<td>' + c.tipo + '</td>' +
+      '<td>' + c.urgencia + '</td>' +
+      '<td>' + c.area + '</td>' +
+      '<td>' + ccCorStatus(c.status) + '</td>' +
+      '<td>' + ccFormatarDataHora(c.dataAbertura) + '</td>' +
+      '<td>' + ccFormatarDataHora(c.dataAtualizacao) + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  html += '<div style="margin-top:6px;font-size:11px;color:#7a9ab8;">' + ordenados.length + ' chamado(s) exibido(s)</div>';
+  return html;
+}
+
+function ccRenderListaChamados() {
+  var area = document.getElementById('cc-lista-area');
+  if (area) area.innerHTML = ccRenderListaChamadosHtml();
+}
+
+function ccRenderDetalhe(id, perfil) {
+  var chamado = null;
+  for (var i = 0; i < chamadosData.length; i++) {
+    if (chamadosData[i].id === id) { chamado = chamadosData[i]; break; }
+  }
+  if (!chamado) return;
+  ccChamadoAtual = chamado;
+
+  var historico = chamado.historico.slice().sort(function(a,b){ return new Date(a.dataHora) - new Date(b.dataHora); });
+  var historicoFiltrado = perfil === 'solicitante'
+    ? historico.filter(function(h){ return h.visibilidade === 'publico'; })
+    : historico;
+
+  var historicoHtml = '';
+  historicoFiltrado.forEach(function(h) {
+    var isBadge = h.acao === 'Comentário adicionado';
+    var bgColor = '';
+    var badge = '';
+    if (isBadge) {
+      if (h.visibilidade === 'interno') {
+        bgColor = 'background:#fff3cd;border-left:3px solid #ffc107;';
+        badge = '<span style="background:#856404;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:6px;">Interno</span>';
+      } else {
+        bgColor = 'background:#e8f4ff;border-left:3px solid #5b83b2;';
+        badge = '<span style="background:#5b83b2;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:6px;">Público</span>';
+      }
+    }
+    historicoHtml +=
+      '<div style="' + bgColor + 'padding:8px 12px;margin-bottom:6px;border-radius:2px;border:1px solid #d0dce8;">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
+          '<span style="font-size:10px;color:#7a9ab8;">' + ccFormatarDataHora(h.dataHora) + '</span>' +
+          '<strong style="font-size:11px;color:#2a4a6a;">' + h.usuario + '</strong>' +
+          badge +
+        '</div>' +
+        '<div style="font-size:11px;color:#1a3a5a;">' +
+          (h.statusNovo && h.statusAnterior ? '<i class="fa fa-arrow-right" style="color:#5b83b2;margin-right:4px;"></i>' : '<i class="fa fa-circle" style="color:#5b83b2;font-size:8px;margin-right:4px;"></i>') +
+          h.acao +
+          (h.statusAnterior && h.statusNovo ? ': ' + ccCorStatus(h.statusAnterior) + ' <i class="fa fa-arrow-right" style="font-size:10px;color:#888;"></i> ' + ccCorStatus(h.statusNovo) : '') +
+        '</div>' +
+        (h.comentario ? '<div style="font-size:11px;color:#1a3a5a;margin-top:6px;padding:6px 8px;background:rgba(255,255,255,0.6);border-radius:2px;">' + h.comentario + '</div>' : '') +
+      '</div>';
+  });
+
+  var infoHtml =
+    '<div class="alt-section" style="margin-bottom:12px;">' +
+      '<div class="alt-sec-title"><i class="fa fa-info-circle"></i> Informações do Chamado</div>' +
+      '<div class="alt-body">' +
+        '<div class="frow">' +
+          '<div class="fg"><label>Número</label><div style="font-size:12px;font-weight:bold;color:#2a4a6a;">' + chamado.id + '</div></div>' +
+          '<div class="fg"><label>Tipo</label><div style="font-size:12px;color:#1a3a5a;">' + chamado.tipo + '</div></div>' +
+          '<div class="fg"><label>Urgência</label><div style="font-size:12px;color:#1a3a5a;">' + chamado.urgencia + '</div></div>' +
+          '<div class="fg"><label>Área</label><div style="font-size:12px;color:#1a3a5a;">' + chamado.area + '</div></div>' +
+          '<div class="fg"><label>Status</label><div>' + ccCorStatus(chamado.status) + '</div></div>' +
+        '</div>' +
+        '<div class="frow">' +
+          '<div class="fg"><label>Data de Abertura</label><div style="font-size:12px;color:#1a3a5a;">' + ccFormatarDataHora(chamado.dataAbertura) + '</div></div>' +
+          '<div class="fg"><label>Responsável</label><div style="font-size:12px;color:#1a3a5a;">' + (chamado.responsavel || '<em style="color:#aaa;">Não atribuído</em>') + '</div></div>' +
+          '<div class="fg"><label>Solicitante</label><div style="font-size:12px;color:#1a3a5a;">' + chamado.solicitante + '</div></div>' +
+        '</div>' +
+        '<div class="frow">' +
+          '<div class="fg" style="flex:1;"><label>Descrição</label><div style="font-size:12px;color:#1a3a5a;background:#f8f9fa;padding:8px;border-radius:2px;border:1px solid #d0dce8;">' + chamado.descricao + '</div></div>' +
+        '</div>' +
+        (chamado.anexos && chamado.anexos.length ? '<div class="frow"><div class="fg"><label>Anexos</label><div style="font-size:11px;color:#1a5aaa;">' + chamado.anexos.map(function(a){ return '<i class="fa fa-paperclip"></i> ' + a; }).join(', ') + '</div></div></div>' : '') +
+      '</div>' +
+    '</div>';
+
+  var acoesHtml = '';
+  if (perfil === 'suporte') {
+    acoesHtml =
+      '<div class="alt-section" style="margin-bottom:12px;">' +
+        '<div class="alt-sec-title"><i class="fa fa-tools"></i> Ações</div>' +
+        '<div class="alt-body">' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+            (chamado.status !== 'Finalizado' && chamado.status !== 'Cancelado' ? '<button class="btn btn-blue" onclick="ccAcaoSuporte(\'assumir\',\'' + chamado.id + '\')"><i class="fa fa-user-check"></i> Assumir</button>' : '') +
+            (chamado.status !== 'Finalizado' && chamado.status !== 'Cancelado' ? '<button class="btn btn-blue" onclick="ccAcaoSuporte(\'status\',\'' + chamado.id + '\')"><i class="fa fa-exchange-alt"></i> Alterar Status</button>' : '') +
+            (chamado.status !== 'Finalizado' && chamado.status !== 'Cancelado' ? '<button class="btn btn-blue" onclick="ccAcaoSuporte(\'comentario\',\'' + chamado.id + '\')"><i class="fa fa-comment"></i> Comentar</button>' : '') +
+            (chamado.status !== 'Finalizado' && chamado.status !== 'Cancelado' && chamado.status !== 'Aguardando validação' ? '<button class="btn btn-blue" onclick="ccAcaoSuporte(\'encaminhar\',\'' + chamado.id + '\')"><i class="fa fa-share"></i> Encaminhar para Validação</button>' : '') +
+            (chamado.status !== 'Finalizado' && chamado.status !== 'Cancelado' ? '<button class="btn btn-green" onclick="ccAcaoSuporte(\'finalizar\',\'' + chamado.id + '\')"><i class="fa fa-check-circle"></i> Finalizar</button>' : '') +
+            (chamado.status !== 'Finalizado' && chamado.status !== 'Cancelado' ? '<button class="btn btn-red" onclick="ccAcaoSuporte(\'cancelar\',\'' + chamado.id + '\')"><i class="fa fa-times-circle"></i> Cancelar</button>' : '') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  var voltarFn = perfil === 'solicitante' ? 'ccRenderSolicitante(\'lista\')' : 'ccRenderSuporteAdmin()';
+
+  // Ações do solicitante: editar, excluir, comentar (só nos próprios chamados não finalizados/cancelados)
+  var acoesSolicitanteHtml = '';
+  if (perfil === 'solicitante' && chamado.solicitante === usuarioAtual.nome &&
+      chamado.status !== 'Finalizado' && chamado.status !== 'Cancelado') {
+    acoesSolicitanteHtml =
+      '<div class="alt-section" style="margin-bottom:12px;">' +
+        '<div class="alt-sec-title"><i class="fa fa-tools"></i> Ações</div>' +
+        '<div class="alt-body">' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+            '<button class="btn btn-blue" onclick="ccAbrirEditarChamado(\'' + chamado.id + '\')"><i class="fa fa-pencil-alt"></i> Editar</button>' +
+            '<button class="btn btn-blue" onclick="ccAbrirComentarSolicitante(\'' + chamado.id + '\')"><i class="fa fa-comment"></i> Comentar</button>' +
+            '<button class="btn btn-red" onclick="ccExcluirChamado(\'' + chamado.id + '\')"><i class="fa fa-trash"></i> Excluir</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  var html =
+    '<div>' +
+      '<div style="margin-bottom:10px;">' +
+        '<button class="btn btn-gray" onclick="' + voltarFn + '"><i class="fa fa-arrow-left"></i> Voltar</button>' +
+      '</div>' +
+      infoHtml +
+      acoesSolicitanteHtml +
+      acoesHtml +
+      '<div class="alt-section">' +
+        '<div class="alt-sec-title"><i class="fa fa-history"></i> Histórico' + (perfil === 'solicitante' ? '' : ' (completo)') + '</div>' +
+        '<div class="alt-body">' +
+          (historicoHtml || '<div style="color:#888;font-size:11px;">Nenhuma entrada no histórico.</div>') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  var area = document.getElementById('cc-content');
+  if (area) area.innerHTML = html;
+}
+// ===== CENTRAL DE CHAMADOS — NOTIFICAÇÕES (Tarefa 8) =====
+
+function ccRenderNotificacoesHtml() {
+  var naoLidas = notificacoesData.filter(function(n){ return !n.lida; }).length;
+  var html =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
+      '<span style="font-size:12px;font-weight:bold;color:#2a4a6a;">' +
+        '<i class="fa fa-bell"></i> Notificações' +
+        (naoLidas > 0 ? ' <span style="background:#e74c3c;color:#fff;border-radius:50%;padding:1px 6px;font-size:10px;">' + naoLidas + ' não lida(s)</span>' : ' <span style="color:#888;font-size:11px;">(todas lidas)</span>') +
+      '</span>' +
+    '</div>';
+
+  if (!notificacoesData.length) {
+    return html + '<div style="padding:20px;text-align:center;color:#888;font-size:12px;"><i class="fa fa-bell-slash" style="font-size:24px;display:block;margin-bottom:8px;"></i>Nenhuma notificação.</div>';
+  }
+
+  var ordenadas = notificacoesData.slice().sort(function(a,b){ return new Date(b.dataHora) - new Date(a.dataHora); });
+  html += '<div>';
+  ordenadas.forEach(function(n) {
+    var bg = n.lida ? 'background:#f8f9fa;' : 'background:#e8f4ff;border-left:3px solid #5b83b2;';
+    var icones = {
+      'Chamado criado': 'fa-plus-circle',
+      'Chamado assumido': 'fa-user-check',
+      'Status alterado': 'fa-exchange-alt',
+      'Comentário adicionado': 'fa-comment',
+      'Chamado finalizado': 'fa-check-circle',
+      'Chamado cancelado': 'fa-times-circle'
+    };
+    var icone = icones[n.tipo] || 'fa-bell';
+    html +=
+      '<div style="' + bg + 'padding:8px 12px;margin-bottom:4px;border-radius:2px;border:1px solid #d0dce8;display:flex;align-items:center;gap:10px;">' +
+        '<i class="fa ' + icone + '" style="color:#5b83b2;font-size:14px;flex-shrink:0;"></i>' +
+        '<div style="flex:1;">' +
+          '<div style="font-size:11px;font-weight:bold;color:#2a4a6a;">' + n.tipo + ' — ' + n.chamadoId + '</div>' +
+          '<div style="font-size:10px;color:#7a9ab8;">' + ccFormatarDataHora(n.dataHora) + '</div>' +
+        '</div>' +
+        (!n.lida ? '<span style="background:#e74c3c;color:#fff;font-size:9px;padding:1px 5px;border-radius:10px;">Nova</span>' : '') +
+      '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function ccRenderNotificacoes() {
+  var area = document.getElementById('cc-notif-area');
+  if (area) area.innerHTML = ccRenderNotificacoesHtml();
+}
+// ===== CENTRAL DE CHAMADOS — VISÃO SUPORTE (Tarefa 10) =====
+
+function ccRenderSuporteAdmin() {
+  var html =
+    '<div style="display:flex;flex-direction:column;">' +
+      '<div class="tabs" id="cc-tabs-sup">' +
+        '<div class="tab active" onclick="ccSwitchTabSup(this,\'cc-tab-fila\')"><i class="fa fa-list-alt"></i> Fila de Chamados</div>' +
+        '<div class="tab" onclick="ccSwitchTabSup(this,\'cc-tab-painel\')"><i class="fa fa-tachometer-alt"></i> Painel</div>' +
+      '</div>' +
+      '<div class="tab-body active" id="cc-tab-fila">' +
+        '<div id="cc-fila-area">' + ccRenderFilaHtml(chamadosData) + '</div>' +
+      '</div>' +
+      '<div class="tab-body" id="cc-tab-painel">' +
+        '<div id="cc-painel-area">' + ccRenderPainelAdminHtml() + '</div>' +
+      '</div>' +
+    '</div>';
+
+  var area = document.getElementById('cc-content');
+  if (area) area.innerHTML = html;
+}
+
+function ccSwitchTabSup(el, id) {
+  var container = el.parentElement;
+  container.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+  el.classList.add('active');
+  var parent = container.parentElement;
+  parent.querySelectorAll('.tab-body').forEach(function(b){ b.classList.remove('active'); });
+  var body = document.getElementById(id);
+  if (body) {
+    body.classList.add('active');
+    if (id === 'cc-tab-painel') {
+      var painelArea = document.getElementById('cc-painel-area');
+      if (painelArea) painelArea.innerHTML = ccRenderPainelAdminHtml();
+    }
+    if (id === 'cc-tab-fila') {
+      var filaArea = document.getElementById('cc-fila-area');
+      if (filaArea) filaArea.innerHTML = ccRenderFilaHtml(chamadosData);
+    }  }
+}
+
+function ccRenderPainelAdminHtml() {
+  var contagem = ccContarPorStatus(chamadosData);
+  var statusList = ['Novo','Em análise','Em tratamento','Aguardando validação','Finalizado','Cancelado'];
+  var cores = {
+    'Novo':                 { bg:'#e8f0fb', border:'#5b83b2', icon:'fa-plus-circle', cor:'#5b83b2' },
+    'Em análise':           { bg:'#fff3cd', border:'#ffc107', icon:'fa-search', cor:'#856404' },
+    'Em tratamento':        { bg:'#fef9e7', border:'#e67e22', icon:'fa-wrench', cor:'#e67e22' },
+    'Aguardando validação': { bg:'#f4ecf7', border:'#6c3483', icon:'fa-clock', cor:'#6c3483' },
+    'Finalizado':           { bg:'#d4edda', border:'#28a745', icon:'fa-check-circle', cor:'#155724' },
+    'Cancelado':            { bg:'#e2e3e5', border:'#6c757d', icon:'fa-times-circle', cor:'#383d41' }
+  };
+  var total = chamadosData.length;
+  var html =
+    '<div class="alt-section" style="margin-bottom:12px;">' +
+      '<div class="alt-sec-title"><i class="fa fa-chart-bar"></i> Resumo por Status</div>' +
+      '<div class="alt-body">' +
+        '<div class="frow" style="flex-wrap:wrap;gap:10px;">';
+  statusList.forEach(function(s) {
+    var c = cores[s] || { bg:'#eee', border:'#ccc', icon:'fa-circle', cor:'#333' };
+    var qtd = contagem[s] || 0;
+    html +=
+      '<div style="background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:4px;padding:12px 18px;min-width:130px;text-align:center;cursor:pointer;" onclick="ccFiltrarPorStatus(\'' + s + '\')">' +
+        '<div style="font-size:24px;font-weight:bold;color:' + c.cor + ';">' + qtd + '</div>' +
+        '<div style="font-size:11px;color:' + c.cor + ';margin-top:4px;"><i class="fa ' + c.icon + '"></i> ' + s + '</div>' +
+      '</div>';
+  });
+  html +=
+        '</div>' +
+        '<div style="margin-top:10px;font-size:11px;color:#7a9ab8;"><strong>Total:</strong> ' + total + ' chamado(s)</div>' +
+      '</div>' +
+    '</div>';
+  return html;
+}
+
+function ccFiltrarPorStatus(status) {
+  // Muda para aba Fila (agora é a primeira aba) e aplica filtro de status
+  var tabFila = document.querySelector('#cc-tabs-sup .tab:nth-child(1)');
+  if (tabFila) ccSwitchTabSup(tabFila, 'cc-tab-fila');
+  setTimeout(function() {
+    var sel = document.getElementById('cc-filtro-status');
+    if (sel) {
+      for (var i = 0; i < sel.options.length; i++) {
+        sel.options[i].selected = (sel.options[i].value === status);
+      }
+      ccAplicarFiltros();
+    }
+  }, 50);
+}
+
+function ccRenderFilaHtml(lista) {
+  var html =
+    '<div class="alt-section" style="margin-bottom:10px;">' +
+      '<div class="alt-sec-title"><i class="fa fa-filter"></i> Filtros</div>' +
+      '<div class="alt-body">' +
+        '<div class="frow" style="align-items:flex-end;">' +
+
+          // Status — combobox
+          '<div class="fg">' +
+            '<label>Status</label>' +
+            '<select id="cc-filtro-status" style="width:180px;font-size:11px;">' +
+              '<option value="">Todos</option>' +
+              '<option value="Novo">Novo</option>' +
+              '<option value="Em análise">Em análise</option>' +
+              '<option value="Em tratamento">Em tratamento</option>' +
+              '<option value="Aguardando validação">Aguardando validação</option>' +
+              '<option value="Finalizado">Finalizado</option>' +
+              '<option value="Cancelado">Cancelado</option>' +
+            '</select>' +
+          '</div>' +
+
+          // Urgência — combobox
+          '<div class="fg">' +
+            '<label>Urgência</label>' +
+            '<select id="cc-filtro-urgencia" style="width:120px;font-size:11px;">' +
+              '<option value="">Todas</option>' +
+              '<option value="Baixa">Baixa</option>' +
+              '<option value="Média">Média</option>' +
+              '<option value="Alta">Alta</option>' +
+              '<option value="Crítica">Crítica</option>' +
+            '</select>' +
+          '</div>' +
+
+          '<div class="fg">' +
+            '<label>Área</label>' +
+            '<select id="cc-filtro-area" style="width:140px;font-size:11px;">' +
+              '<option value="">Todas</option>' +
+              '<option>NUGESP</option>' +
+              '<option>NUGEP</option>' +
+              '<option>NUGED</option>' +
+              '<option>NUGEF</option>' +
+              '<option>DIRAD</option>' +
+              '<option>SEAD</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="fg">' +
+            '<label>Solicitante</label>' +
+            '<input type="text" id="cc-filtro-solicitante" style="width:140px;font-size:11px;" placeholder="Nome..."/>' +
+          '</div>' +
+          '<div class="fg">' +
+            '<label>Responsável</label>' +
+            '<select id="cc-filtro-responsavel" style="width:160px;font-size:11px;">' +
+              '<option value="">Todos</option>' +
+              '<option value="__sem__">Sem responsável</option>' +
+              '<option value="Evelen Silva">Evelen Silva</option>' +
+              '<option value="Matheus Neto">Matheus Neto</option>' +
+              '<option value="Raiane Rocha">Raiane Rocha</option>' +
+              '<option value="Evelyn Fernandes">Evelyn Fernandes</option>' +
+            '</select>' +
+          '</div>' +
+
+        '</div>' +
+        '<div style="display:flex;gap:6px;margin-top:10px;">' +
+          '<button class="btn btn-blue" onclick="ccAplicarFiltros()"><i class="fa fa-search"></i> Filtrar</button>' +
+          '<button class="btn btn-gray" onclick="ccLimparFiltros()"><i class="fa fa-times"></i> Limpar</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="action-bar" style="margin-bottom:8px;">' +
+      '<div class="spacer" style="flex:1;"></div>' +
+      '<div class="dropdown-wrap">' +
+        '<button class="btn btn-gray" onclick="toggleDropdown(event,\'cc-sup-dd-opcoes\')"><i class="fa fa-bars"></i> +Opções <i class="fa fa-caret-down"></i></button>' +
+        '<div class="dropdown-menu" id="cc-sup-dd-opcoes">' +
+          '<a onclick="ccSupOpcaoVisualizar()"><i class="fa fa-eye" style="margin-right:6px;"></i> Visualizar Chamado</a>' +
+          '<a onclick="ccSupOpcaoAlterar()"><i class="fa fa-exchange-alt" style="margin-right:6px;"></i> Alterar</a>' +
+          '<a onclick="ccSupOpcaoComentario()"><i class="fa fa-comment" style="margin-right:6px;"></i> Adicionar Comentário</a>' +
+          '<a onclick="ccSupOpcaoAssumir()"><i class="fa fa-user-check" style="margin-right:6px;"></i> Assumir</a>' +
+          '<a onclick="ccSupOpcaoFinalizar()"><i class="fa fa-check-circle" style="margin-right:6px;"></i> Finalizar</a>' +
+          '<a onclick="ccSupOpcaoCancelar()"><i class="fa fa-times-circle" style="margin-right:6px;"></i> Cancelar</a>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div id="cc-tabela-fila">' + ccRenderTabelaFilaHtml(lista) + '</div>';
+  return html;
+}
+
+function ccSupOpcaoVisualizar() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  if (!ccSupLinhaSelecionada) { alert('Selecione um chamado na lista antes de usar esta opção.'); return; }
+  ccRenderDetalhe(ccSupLinhaSelecionada, 'suporte');
+}
+
+function ccSupOpcaoAlterar() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  if (!ccSupLinhaSelecionada) { alert('Selecione um chamado na lista antes de usar esta opção.'); return; }
+  ccAcaoSuporte('status', ccSupLinhaSelecionada);
+}
+function ccSupOpcaoComentario() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  if (!ccSupLinhaSelecionada) { alert('Selecione um chamado na lista antes de usar esta opção.'); return; }
+  ccAcaoSuporte('comentario', ccSupLinhaSelecionada);
+}
+
+function ccSupOpcaoAssumir() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  if (!ccSupLinhaSelecionada) { alert('Selecione um chamado na lista antes de usar esta opção.'); return; }
+  ccAcaoSuporte('assumir', ccSupLinhaSelecionada);
+}
+
+function ccSupOpcaoFinalizar() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  if (!ccSupLinhaSelecionada) { alert('Selecione um chamado na lista antes de usar esta opção.'); return; }
+  ccAcaoSuporte('finalizar', ccSupLinhaSelecionada);
+}
+
+function ccSupOpcaoCancelar() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  if (!ccSupLinhaSelecionada) { alert('Selecione um chamado na lista antes de usar esta opção.'); return; }
+  ccAcaoSuporte('cancelar', ccSupLinhaSelecionada);
+}
+
+function ccRenderTabelaFilaHtml(lista) {
+  var ordenados = ccOrdenarPorData(lista);
+  if (!ordenados.length) {
+    return '<div style="padding:20px;text-align:center;color:#888;font-size:12px;"><i class="fa fa-inbox" style="font-size:24px;display:block;margin-bottom:8px;"></i>Nenhum chamado encontrado.</div>';
+  }
+  var html = '<table class="grid"><thead><tr>' +
+    '<th>Número</th><th>Tipo</th><th>Urgência</th><th>Área</th><th>Solicitante</th><th>Responsável</th><th>Status</th><th>Data de Abertura</th><th>Anexos</th>' +
+    '</tr></thead><tbody>';
+  ordenados.forEach(function(c) {
+    var anexosHtml = '';
+    if (c.anexos && c.anexos.length > 0) {
+      anexosHtml = '<span style="display:flex;align-items:center;gap:4px;">' +
+        '<span style="font-size:11px;color:#1a3a5a;">' + c.anexos.length + ' arquivo(s)</span>' +
+        '<button class="icoBtn" onclick="ccVerAnexos(\'' + c.id + '\');event.stopPropagation();" title="Visualizar anexos"><i class="fa fa-eye"></i></button>' +
+        '</span>';
+    } else {
+      anexosHtml = '<span style="color:#aaa;font-size:10px;">—</span>';
+    }
+    html += '<tr data-id="' + c.id + '" onclick="ccSupSelecionarLinha(\'' + c.id + '\')" style="cursor:pointer;">' +
+      '<td>' + c.id + '</td>' +
+      '<td>' + c.tipo + '</td>' +
+      '<td>' + c.urgencia + '</td>' +
+      '<td>' + c.area + '</td>' +
+      '<td>' + c.solicitante + '</td>' +
+      '<td>' + (c.responsavel || '<em style="color:#aaa;">—</em>') + '</td>' +
+      '<td>' + ccCorStatus(c.status) + '</td>' +
+      '<td>' + ccFormatarDataHora(c.dataAbertura) + '</td>' +
+      '<td onclick="event.stopPropagation();">' + anexosHtml + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  html += '<div style="margin-top:6px;font-size:11px;color:#7a9ab8;">' + ordenados.length + ' chamado(s) exibido(s)</div>';
+  return html;
+}
+
+// Variável para rastrear linha selecionada na fila do suporte
+var ccSupLinhaSelecionada = null;
+
+function ccSupSelecionarLinha(id) {
+  ccSupLinhaSelecionada = id;
+  var rows = document.querySelectorAll('#cc-tabela-fila table.grid tbody tr');
+  rows.forEach(function(r) {
+    r.classList.remove('selected');
+    if (r.getAttribute('data-id') === id) r.classList.add('selected');
+  });
+}
+
+function ccVerAnexos(id) {
+  var chamado = null;
+  for (var i = 0; i < chamadosData.length; i++) {
+    if (chamadosData[i].id === id) { chamado = chamadosData[i]; break; }
+  }
+  if (!chamado || !chamado.anexos || !chamado.anexos.length) return;
+  alert('Anexos do chamado ' + id + ':\n\n' + chamado.anexos.map(function(a, i){ return (i+1) + '. ' + a; }).join('\n'));
+}
+
+function ccAplicarFiltros() {
+  var statusVal  = (document.getElementById('cc-filtro-status')      || {value:''}).value;
+  var urgenciaVal = (document.getElementById('cc-filtro-urgencia')   || {value:''}).value;
+  var area        = (document.getElementById('cc-filtro-area')       || {value:''}).value;
+  var solicitante = (document.getElementById('cc-filtro-solicitante')|| {value:''}).value;
+  var responsavel = (document.getElementById('cc-filtro-responsavel')|| {value:''}).value;
+
+  // Adapta para o formato esperado por ccFiltrarChamados (arrays)
+  var statusFiltro   = statusVal   ? [statusVal]   : [];
+  var urgenciaFiltro = urgenciaVal ? [urgenciaVal] : [];
+
+  var filtros = { status: statusFiltro, urgencia: urgenciaFiltro, area: area, solicitante: solicitante, responsavel: responsavel };
+  var resultado = ccFiltrarChamados(chamadosData, filtros);
+  var tabela = document.getElementById('cc-tabela-fila');
+  if (tabela) tabela.innerHTML = ccRenderTabelaFilaHtml(resultado);
+}
+
+function ccLimparFiltros() {
+  ['cc-filtro-status','cc-filtro-urgencia','cc-filtro-area','cc-filtro-responsavel'].forEach(function(id){
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  var sol = document.getElementById('cc-filtro-solicitante');
+  if (sol) sol.value = '';
+  var tabela = document.getElementById('cc-tabela-fila');
+  if (tabela) tabela.innerHTML = ccRenderTabelaFilaHtml(chamadosData);
+}
+// ===== CENTRAL DE CHAMADOS — AÇÕES DO SUPORTE (Tarefa 11) =====
+
+function ccAcaoSuporte(tipo, id) {
+  window._ccModalId = id;
+  var chamado = null;
+  for (var i = 0; i < chamadosData.length; i++) {
+    if (chamadosData[i].id === id) { chamado = chamadosData[i]; break; }
+  }
+  if (!chamado) return;
+
+  if (tipo === 'assumir') {
+    var sel = document.getElementById('cc-assumir-resp');
+    if (sel) sel.value = chamado.responsavel || '';
+    var erro = document.getElementById('cc-assumir-erro');
+    if (erro) erro.style.display = 'none';
+    document.getElementById('modal-cc-assumir').classList.add('open');
+
+  } else if (tipo === 'status') {
+    var statusOpts = ['Novo','Em análise','Em tratamento','Aguardando validação','Finalizado','Cancelado'];
+    var sel2 = document.getElementById('cc-status-novo');
+    if (sel2) {
+      sel2.innerHTML = '<option value=""></option>';
+      statusOpts.forEach(function(s) {
+        if (s !== chamado.status) {
+          var opt = document.createElement('option');
+          opt.value = s; opt.textContent = s;
+          sel2.appendChild(opt);
+        }
+      });
+    }
+    var erro2 = document.getElementById('cc-status-erro');
+    if (erro2) erro2.style.display = 'none';
+    document.getElementById('modal-cc-status').classList.add('open');
+
+  } else if (tipo === 'comentario') {
+    var txt = document.getElementById('cc-coment-texto');
+    if (txt) txt.value = '';
+    var visib = document.getElementById('cc-coment-visib');
+    if (visib) visib.value = 'publico';
+    var erro3 = document.getElementById('cc-coment-erro');
+    if (erro3) erro3.style.display = 'none';
+    document.getElementById('modal-cc-comentario').classList.add('open');
+
+  } else if (tipo === 'encaminhar') {
+    ccConfirmarAcao('encaminhar', id, {});
+
+  } else if (tipo === 'finalizar') {
+    document.getElementById('modal-cc-finalizar').classList.add('open');
+
+  } else if (tipo === 'cancelar') {
+    document.getElementById('modal-cc-cancelar').classList.add('open');
+  }
+}
+
+function ccConfirmarAcao(tipo, id, dados) {
+  var chamado = null;
+  for (var i = 0; i < chamadosData.length; i++) {
+    if (chamadosData[i].id === id) { chamado = chamadosData[i]; break; }
+  }
+  if (!chamado) return;
+
+  var agora = new Date().toISOString();
+  var statusAnterior = chamado.status;
+  var solicitante = chamado.solicitante; // destinatário das notificações do suporte
+
+  if (tipo === 'assumir') {
+    if (!dados.responsavel || !dados.responsavel.trim()) {
+      var erro = document.getElementById('cc-assumir-erro');
+      if (erro) erro.style.display = 'block';
+      return;
+    }
+    chamado.responsavel = dados.responsavel;
+    chamado.status = 'Em análise';
+    chamado.dataAtualizacao = agora;
+    chamado.historico.push({ dataHora: agora, usuario: 'Pessoa Central', acao: 'Chamado assumido', statusAnterior: statusAnterior, statusNovo: 'Em análise', visibilidade: 'publico', comentario: null });
+    ccGerarNotificacao('Chamado assumido', id, solicitante);
+    document.getElementById('modal-cc-assumir').classList.remove('open');
+
+  } else if (tipo === 'status') {
+    if (!dados.statusNovo || !dados.statusNovo.trim()) {
+      var erro2 = document.getElementById('cc-status-erro');
+      if (erro2) erro2.style.display = 'block';
+      return;
+    }
+    chamado.status = dados.statusNovo;
+    chamado.dataAtualizacao = agora;
+    chamado.historico.push({ dataHora: agora, usuario: 'Pessoa Central', acao: 'Status alterado', statusAnterior: statusAnterior, statusNovo: dados.statusNovo, visibilidade: 'publico', comentario: null });
+    ccGerarNotificacao('Status alterado', id, solicitante);
+    document.getElementById('modal-cc-status').classList.remove('open');
+
+  } else if (tipo === 'comentario') {
+    if (!dados.texto || !dados.texto.trim()) {
+      var erro3 = document.getElementById('cc-coment-erro');
+      if (erro3) erro3.style.display = 'block';
+      return;
+    }
+    chamado.dataAtualizacao = agora;
+    chamado.historico.push({ dataHora: agora, usuario: 'Pessoa Central', acao: 'Comentário adicionado', statusAnterior: null, statusNovo: null, visibilidade: dados.visibilidade || 'publico', comentario: dados.texto });
+    // Comentário público notifica o solicitante; interno não
+    if ((dados.visibilidade || 'publico') === 'publico') {
+      ccGerarNotificacao('Comentário adicionado', id, solicitante);
+    }
+    document.getElementById('modal-cc-comentario').classList.remove('open');
+
+  } else if (tipo === 'encaminhar') {
+    chamado.status = 'Aguardando validação';
+    chamado.dataAtualizacao = agora;
+    chamado.historico.push({ dataHora: agora, usuario: 'Pessoa Central', acao: 'Encaminhado para validação', statusAnterior: statusAnterior, statusNovo: 'Aguardando validação', visibilidade: 'publico', comentario: null });
+    ccGerarNotificacao('Status alterado', id, solicitante);
+
+  } else if (tipo === 'finalizar') {
+    chamado.status = 'Finalizado';
+    chamado.dataAtualizacao = agora;
+    chamado.historico.push({ dataHora: agora, usuario: 'Pessoa Central', acao: 'Chamado finalizado', statusAnterior: statusAnterior, statusNovo: 'Finalizado', visibilidade: 'publico', comentario: null });
+    ccGerarNotificacao('Chamado finalizado', id, solicitante);
+    document.getElementById('modal-cc-finalizar').classList.remove('open');
+
+  } else if (tipo === 'cancelar') {
+    chamado.status = 'Cancelado';
+    chamado.dataAtualizacao = agora;
+    chamado.historico.push({ dataHora: agora, usuario: 'Pessoa Central', acao: 'Chamado cancelado', statusAnterior: statusAnterior, statusNovo: 'Cancelado', visibilidade: 'publico', comentario: null });
+    ccGerarNotificacao('Chamado cancelado', id, solicitante);
+    document.getElementById('modal-cc-cancelar').classList.remove('open');
+  }
+
+  // Re-renderiza o detalhe atualizado
+  ccRenderDetalhe(id, 'suporte');
+}
+
+// ===== AÇÕES DO SOLICITANTE =====
+
+function ccAbrirEditarChamado(id) {
+  var chamado = null;
+  for (var i = 0; i < chamadosData.length; i++) {
+    if (chamadosData[i].id === id) { chamado = chamadosData[i]; break; }
+  }
+  if (!chamado) return;
+
+  var area = document.getElementById('cc-content');
+  if (!area) return;
+
+  area.innerHTML =
+    '<div>' +
+      '<div style="margin-bottom:10px;">' +
+        '<button class="btn btn-gray" onclick="ccRenderDetalhe(\'' + id + '\',\'solicitante\')"><i class="fa fa-arrow-left"></i> Voltar</button>' +
+      '</div>' +
+      '<div class="alt-section">' +
+        '<div class="alt-sec-title"><i class="fa fa-pencil-alt"></i> Editar Chamado ' + id + '</div>' +
+        '<div class="alt-body">' +
+          '<div class="frow">' +
+            '<div class="fg"><label class="req">Tipo da Solicitação</label>' +
+              '<select id="cc-edit-tipo" style="width:220px">' +
+                '<option' + (chamado.tipo==='Acesso ao sistema'?' selected':'') + '>Acesso ao sistema</option>' +
+                '<option' + (chamado.tipo==='Dúvida'?' selected':'') + '>Dúvida</option>' +
+                '<option' + (chamado.tipo==='Erro/Bug'?' selected':'') + '>Erro/Bug</option>' +
+                '<option' + (chamado.tipo==='Solicitação de cadastro'?' selected':'') + '>Solicitação de cadastro</option>' +
+                '<option' + (chamado.tipo==='Outros'?' selected':'') + '>Outros</option>' +
+              '</select>' +
+            '</div>' +
+            '<div class="fg"><label class="req">Nível de Urgência</label>' +
+              '<select id="cc-edit-urgencia" style="width:160px">' +
+                '<option' + (chamado.urgencia==='Baixa'?' selected':'') + '>Baixa</option>' +
+                '<option' + (chamado.urgencia==='Média'?' selected':'') + '>Média</option>' +
+                '<option' + (chamado.urgencia==='Alta'?' selected':'') + '>Alta</option>' +
+                '<option' + (chamado.urgencia==='Crítica'?' selected':'') + '>Crítica</option>' +
+              '</select>' +
+            '</div>' +
+            '<div class="fg"><label class="req">Área do Usuário</label>' +
+              '<select id="cc-edit-area" style="width:160px">' +
+                '<option' + (chamado.area==='NUGESP'?' selected':'') + '>NUGESP</option>' +
+                '<option' + (chamado.area==='NUGEP'?' selected':'') + '>NUGEP</option>' +
+                '<option' + (chamado.area==='NUGED'?' selected':'') + '>NUGED</option>' +
+                '<option' + (chamado.area==='NUGEF'?' selected':'') + '>NUGEF</option>' +
+                '<option' + (chamado.area==='DIRAD'?' selected':'') + '>DIRAD</option>' +
+                '<option' + (chamado.area==='SEAD'?' selected':'') + '>SEAD</option>' +
+              '</select>' +
+            '</div>' +
+          '</div>' +
+          '<div class="frow">' +
+            '<div class="fg" style="flex:1;"><label class="req">Descrição</label>' +
+              '<textarea id="cc-edit-descricao" style="width:100%;height:80px;font-size:11px;padding:4px 6px;border:1px solid #aabbd0;border-radius:2px;resize:vertical;">' + chamado.descricao + '</textarea>' +
+            '</div>' +
+          '</div>' +
+          '<div class="req-note">* Preenchimento obrigatório</div>' +
+          '<div class="alt-actions">' +
+            '<button class="btn btn-green" onclick="ccSalvarEdicao(\'' + id + '\')"><i class="fa fa-check"></i> Salvar Edição</button>' +
+            '<button class="btn btn-gray" onclick="ccRenderDetalhe(\'' + id + '\',\'solicitante\')"><i class="fa fa-times"></i> Cancelar</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function ccSalvarEdicao(id) {
+  var chamado = null;
+  for (var i = 0; i < chamadosData.length; i++) {
+    if (chamadosData[i].id === id) { chamado = chamadosData[i]; break; }
+  }
+  if (!chamado) return;
+
+  var tipo = (document.getElementById('cc-edit-tipo') || {value:''}).value;
+  var urgencia = (document.getElementById('cc-edit-urgencia') || {value:''}).value;
+  var area = (document.getElementById('cc-edit-area') || {value:''}).value;
+  var descricao = (document.getElementById('cc-edit-descricao') || {value:''}).value.trim();
+
+  if (!tipo || !urgencia || !area || !descricao) {
+    alert('Preencha todos os campos obrigatórios.');
+    return;
+  }
+
+  var agora = new Date().toISOString();
+  chamado.tipo = tipo;
+  chamado.urgencia = urgencia;
+  chamado.area = area;
+  chamado.descricao = descricao;
+  chamado.dataAtualizacao = agora;
+  chamado.historico.push({
+    dataHora: agora,
+    usuario: usuarioAtual.nome,
+    acao: 'Chamado editado pelo solicitante',
+    statusAnterior: null, statusNovo: null,
+    visibilidade: 'publico',
+    comentario: null
+  });
+
+  // Notifica a Pessoa Central
+  ccGerarNotificacao('Chamado editado', id, 'PESSOA CENTRAL');
+  ccRenderDetalhe(id, 'solicitante');
+}
+
+function ccAbrirComentarSolicitante(id) {
+  var existing = document.getElementById('modal-cc-coment-sol');
+  if (existing) existing.parentNode.removeChild(existing);
+
+  var div = document.createElement('div');
+  div.className = 'modal-overlay open';
+  div.id = 'modal-cc-coment-sol';
+  div.innerHTML =
+    '<div class="modal-box" style="width:500px;">' +
+      '<div class="modal-title">Adicionar Comentário' +
+        '<span class="close-btn" onclick="document.getElementById(\'modal-cc-coment-sol\').classList.remove(\'open\')"><i class="fa fa-times"></i></span>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="fg">' +
+          '<label class="req">Comentário</label>' +
+          '<textarea id="cc-coment-sol-texto" style="width:100%;height:80px;font-size:11px;padding:4px 6px;border:1px solid #aabbd0;border-radius:2px;resize:vertical;"></textarea>' +
+        '</div>' +
+        '<div style="font-size:11px;color:#7a9ab8;margin-top:6px;"><i class="fa fa-info-circle"></i> Seu comentário será visível para a equipe de suporte.</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-blue" onclick="ccSalvarComentarioSolicitante(\'' + id + '\')"><i class="fa fa-paper-plane"></i> Enviar</button>' +
+        '<button class="btn btn-gray" onclick="document.getElementById(\'modal-cc-coment-sol\').classList.remove(\'open\')">Cancelar</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(div);
+}
+
+function ccSalvarComentarioSolicitante(id) {
+  var texto = (document.getElementById('cc-coment-sol-texto') || {value:''}).value.trim();
+  if (!texto) { alert('Digite um comentário.'); return; }
+
+  var chamado = null;
+  for (var i = 0; i < chamadosData.length; i++) {
+    if (chamadosData[i].id === id) { chamado = chamadosData[i]; break; }
+  }
+  if (!chamado) return;
+
+  var agora = new Date().toISOString();
+  chamado.dataAtualizacao = agora;
+  chamado.historico.push({
+    dataHora: agora,
+    usuario: usuarioAtual.nome,
+    acao: 'Comentário adicionado',
+    statusAnterior: null, statusNovo: null,
+    visibilidade: 'publico',
+    comentario: texto
+  });
+
+  // Notifica a Pessoa Central
+  ccGerarNotificacao('Comentário adicionado', id, 'PESSOA CENTRAL');
+
+  var modal = document.getElementById('modal-cc-coment-sol');
+  if (modal) modal.classList.remove('open');
+  ccRenderDetalhe(id, 'solicitante');
+}
+
+function ccExcluirChamado(id) {
+  if (!confirm('Tem certeza que deseja excluir o chamado ' + id + '? Esta ação não pode ser desfeita.')) return;
+
+  // Notifica a Pessoa Central antes de excluir
+  ccGerarNotificacao('Chamado excluído', id, 'PESSOA CENTRAL');
+
+  for (var i = 0; i < chamadosData.length; i++) {
+    if (chamadosData[i].id === id) {
+      chamadosData.splice(i, 1);
+      break;
+    }
+  }
+  // Remove notificações do solicitante relacionadas (mantém as da Pessoa Central)
+  notificacoesData = notificacoesData.filter(function(n){
+    return !(n.chamadoId === id && n.destinatario === usuarioAtual.nome);
+  });
+  ccRenderSolicitante('lista');
+}
+
+// ============================================================
+// MANTER CONDIÇÕES AMBIENTAIS DO TRABALHO (S-2240)
+// ============================================================
+
+var tabela24 = [
+  { cod:'01.01.001', desc:'Arsênio e seus compostos' },
+  { cod:'01.02.001', desc:'Asbestos (ou amianto)' },
+  { cod:'01.03.001', desc:'Benzeno e seus compostos tóxicos' },
+  { cod:'01.03.002', desc:'Estireno (vinilbenzeno)' },
+  { cod:'01.04.001', desc:'Berílio e seus compostos tóxicos' },
+  { cod:'01.05.001', desc:'Bromo e seus compostos tóxicos' },
+  { cod:'01.06.001', desc:'Cádmio e seus compostos tóxicos' },
+  { cod:'01.07.001', desc:'Carvão mineral e seus derivados' },
+  { cod:'01.08.001', desc:'Chumbo e seus compostos tóxicos' },
+  { cod:'01.09.001', desc:'Cloro e seus compostos tóxicos' },
+  { cod:'01.09.002', desc:'Metileno-ortocloroanilina, MOCA®' },
+  { cod:'01.09.003', desc:'Bis (cloro metil) éter' },
+  { cod:'01.09.004', desc:'Biscloroetileter (éter dicloroetílico)' },
+  { cod:'01.09.005', desc:'Clorambucil (cloroambucil)' },
+  { cod:'01.09.006', desc:'Cloropreno' },
+  { cod:'01.10.001', desc:'Cromo e seus compostos tóxicos' },
+  { cod:'01.11.001', desc:'Dissulfeto de carbono' },
+  { cod:'01.12.001', desc:'Fósforo e seus compostos tóxicos' },
+  { cod:'01.13.001', desc:'Iodo' },
+  { cod:'01.14.001', desc:'Manganês e seus compostos' },
+  { cod:'01.15.001', desc:'Mercúrio e seus compostos' },
+  { cod:'01.16.001', desc:'Níquel e seus compostos tóxicos' },
+  { cod:'01.17.001', desc:'Petróleo, xisto betuminoso, gás natural e seus derivados' },
+  { cod:'01.18.001', desc:'Sílica livre' },
+  { cod:'01.19.001', desc:'Butadieno-estireno' },
+  { cod:'01.19.002', desc:'Acrilonitrila' },
+  { cod:'01.19.003', desc:'1-3-butadieno' },
+  { cod:'01.19.004', desc:'Mercaptanos (tióis)' },
+  { cod:'01.19.005', desc:'n-hexano' },
+  { cod:'01.19.006', desc:'Diisocianato de tolueno (TDI)' },
+  { cod:'01.19.007', desc:'Aminas aromáticas' },
+  { cod:'01.19.008', desc:'Aminobifenila (4-aminodifenil)' },
+  { cod:'01.19.009', desc:'Auramina' },
+  { cod:'01.19.010', desc:'Azatioprina' },
+  { cod:'01.19.011', desc:'1-4-butanodiol' },
+  { cod:'01.19.012', desc:'Dimetanosulfonato (MIRELAN)' },
+  { cod:'01.19.013', desc:'Ciclofosfamida' },
+  { cod:'01.19.014', desc:'Dietiletil-bestrol' },
+  { cod:'01.19.015', desc:'Acronitrila' },
+  { cod:'01.19.016', desc:'Nitronaftilamina' },
+  { cod:'01.19.017', desc:'4-dimetil-aminoazobenzeno' },
+  { cod:'01.19.018', desc:'Benzopireno' },
+  { cod:'01.19.019', desc:'Beta-propiolactona' },
+  { cod:'01.19.021', desc:'Dianizidina' },
+  { cod:'01.19.022', desc:'Dietilsulfato' },
+  { cod:'01.19.023', desc:'Dimetilsulfato' },
+  { cod:'01.19.024', desc:'Etilenoamina' },
+  { cod:'01.19.025', desc:'Etilenotiureia' },
+  { cod:'01.19.026', desc:'Fenacetina' },
+  { cod:'01.19.027', desc:'Iodeto de metila' },
+  { cod:'01.19.028', desc:'Etilnitrosureia' },
+  { cod:'01.19.029', desc:'Nitrosamina' },
+  { cod:'01.19.030', desc:'Ortotoluidina' },
+  { cod:'01.19.031', desc:'Oximetalona' },
+  { cod:'01.19.032', desc:'Procarbazina' },
+  { cod:'01.19.033', desc:'Propanosultona' },
+  { cod:'01.19.034', desc:'Óxido de etileno' },
+  { cod:'01.19.035', desc:'Estilbenzeno (etilbenzeno)' },
+  { cod:'01.19.036', desc:'Creosoto' },
+  { cod:'01.19.038', desc:'Benzidina' },
+  { cod:'01.19.039', desc:'Betanaftilamina' },
+  { cod:'01.19.040', desc:'1-cloro-2,4-nitrodifenil' },
+  { cod:'01.19.041', desc:'3-poxipropano' },
+  { cod:'02.01.001', desc:'Ruído' },
+  { cod:'02.01.002', desc:'Vibrações localizadas (mão-braço)' },
+  { cod:'02.01.003', desc:'Vibração de corpo inteiro (aren)' },
+  { cod:'02.01.004', desc:'Vibração de corpo inteiro (VDVR)' },
+  { cod:'02.01.005', desc:'Trabalhos com perfuratrizes e marteletes pneumáticos' },
+  { cod:'02.01.006', desc:'Radiações ionizantes' },
+  { cod:'02.01.007', desc:'Extração e beneficiamento de minerais radioativos' },
+  { cod:'02.01.008', desc:'Atividades em minerações com exposição ao radônio' },
+  { cod:'02.01.009', desc:'Manutenção em unidades de extração de minerais radioativos' },
+  { cod:'02.01.010', desc:'Operações com reatores nucleares ou fontes radioativas' },
+  { cod:'02.01.011', desc:'Trabalhos com raios Alfa, Beta, Gama e X, nêutrons e substâncias radioativas' },
+  { cod:'02.01.012', desc:'Fabricação e manipulação de produtos radioativos' },
+  { cod:'02.01.013', desc:'Pesquisas com radiações ionizantes em laboratórios' },
+  { cod:'02.01.014', desc:'Trabalhos com exposição ao calor (NR-15)' },
+  { cod:'02.01.015', desc:'Pressão atmosférica anormal' },
+  { cod:'02.01.016', desc:'Trabalhos em caixões ou câmaras hiperbáricas' },
+  { cod:'02.01.017', desc:'Trabalhos em tubulões ou túneis sob ar comprimido' },
+  { cod:'02.01.018', desc:'Operações de mergulho com escafandros' },
+  { cod:'03.01.001', desc:'Trabalhos em estabelecimentos de saúde com doenças infectocontagiosas' },
+  { cod:'03.01.002', desc:'Trabalhos com animais infectados para soro, vacinas e outros produtos' },
+  { cod:'03.01.003', desc:'Trabalhos em laboratórios de autópsia e anatomia' },
+  { cod:'03.01.004', desc:'Exumação de corpos e manipulação de resíduos de animais deteriorados' },
+  { cod:'03.01.005', desc:'Trabalhos em galerias, fossas e tranques de esgoto' },
+  { cod:'03.01.006', desc:'Esvaziamento de biodigestores' },
+  { cod:'03.01.007', desc:'Coleta e industrialização do lixo' },
+  { cod:'04.01.001', desc:'Mineração subterrânea afastada das frentes de produção' },
+  { cod:'04.01.002', desc:'Mineração subterrânea em frente de produção' },
+  { cod:'05.01.001', desc:'Agentes nocivos não constantes no Anexo IV do Decreto 3.048/1999 (decisão judicial/administrativa)' },
+  { cod:'09.01.001', desc:'Ausência de agente nocivo ou de atividades previstas no Anexo IV do Decreto 3.048/1999' }
+
+];
+
+// Dados simulados de Condições Ambientais
+var catData = [
+  {
+    id:1, nome:'Exposição a Ruído Contínuo - Setor de Manutenção', tipoAmb:'Próprio empregador',
+    setor:'Oficina de Manutenção Predial', atividade:'Operação de equipamentos de corte e perfuração em ambiente fechado',
+    agentePrincipal:'02.01.001 - Ruído', situacao:'Ativa', responsavel:'Dr. Carlos Mendes (CRM 12345)',
+    ultimaAlteracao:'10/05/2026', dtIni:'2024-01-15', dtFim:'',
+    ambientes:[{localAmb:'1',dscSetor:'Oficina de Manutenção Predial',tpInsc:'1',nrInsc:'04.892.991/0001-44'}],
+    agentes:[{cod:'02.01.001',desc:'Ruído',tpAval:'1',intConc:'87',limTol:'85',unMed:'dB(A)',tecMedicao:'Dosimetria',nrProcJud:'',
+      epc:{utilizEPC:'2',eficEpc:'S',utilizEPI:'2',eficEpi:'S',docAval:'Laudo Técnico 2024-001',
+        medProtecao:'S',condFuncto:'S',usoInint:'S',przValid:'S',periodicTroca:'S',higienizacao:'S'}}],
+    responsavelReg:{cpfResp:'123.456.789-00',ideOC:'1',dscOC:'',nrOC:'12345',ufOC:'PA'},
+    obsCompl:'Ambiente com ruído acima do limite de tolerância. Uso de EPI obrigatório.',
+    historico:[{data:'10/05/2026 14:32',usuario:'PESSOA CENTRAL',acao:'Alteração de dados do agente nocivo'},
+               {data:'15/01/2024 09:00',usuario:'PESSOA CENTRAL',acao:'Cadastro inicial da condição ambiental'}]
+  },
+  {
+    id:2, nome:'Exposição a Agentes Químicos - Laboratório de Análises', tipoAmb:'Próprio empregador',
+    setor:'Laboratório Central de Análises Clínicas', atividade:'Manuseio de reagentes químicos e amostras biológicas',
+    agentePrincipal:'01.15.001 - Mercúrio e seus compostos', situacao:'Ativa', responsavel:'Eng. Ana Paula Costa (CREA 67890)',
+    ultimaAlteracao:'02/04/2026', dtIni:'2023-06-01', dtFim:'',
+    ambientes:[{localAmb:'1',dscSetor:'Laboratório Central de Análises Clínicas',tpInsc:'1',nrInsc:'04.892.991/0001-44'}],
+    agentes:[{cod:'01.15.001',desc:'Mercúrio e seus compostos',tpAval:'1',intConc:'0.02',limTol:'0.05',unMed:'mg/m³',tecMedicao:'Amostragem passiva',nrProcJud:'',
+      epc:{utilizEPC:'2',eficEpc:'S',utilizEPI:'2',eficEpi:'S',docAval:'Laudo PPRA 2023',
+        medProtecao:'S',condFuncto:'S',usoInint:'N',przValid:'S',periodicTroca:'S',higienizacao:'S'}}],
+    responsavelReg:{cpfResp:'987.654.321-00',ideOC:'4',dscOC:'',nrOC:'67890',ufOC:'PA'},
+    obsCompl:'',
+    historico:[{data:'02/04/2026 10:15',usuario:'PESSOA CENTRAL',acao:'Atualização do responsável técnico'},
+               {data:'01/06/2023 08:00',usuario:'PESSOA CENTRAL',acao:'Cadastro inicial da condição ambiental'}]
+  },
+  {
+    id:3, nome:'Trabalho em Ambiente Biológico - Unidade de Saúde', tipoAmb:'Próprio empregador',
+    setor:'Unidade Básica de Saúde do Servidor', atividade:'Atendimento a pacientes com doenças infectocontagiosas',
+    agentePrincipal:'03.01.001 - Trabalhos em estabelecimentos de saúde', situacao:'Rascunho', responsavel:'',
+    ultimaAlteracao:'20/05/2026', dtIni:'2026-05-20', dtFim:'',
+    ambientes:[{localAmb:'1',dscSetor:'Unidade Básica de Saúde do Servidor',tpInsc:'1',nrInsc:'04.892.991/0001-44'}],
+    agentes:[{cod:'03.01.001',desc:'Trabalhos em estabelecimentos de saúde com doenças infectocontagiosas',tpAval:'2',intConc:'',limTol:'',unMed:'',tecMedicao:'',nrProcJud:'',
+      epc:{utilizEPC:'2',eficEpc:'S',utilizEPI:'2',eficEpi:'S',docAval:'',
+        medProtecao:'S',condFuncto:'S',usoInint:'S',przValid:'S',periodicTroca:'S',higienizacao:'S'}}],
+    responsavelReg:{cpfResp:'',ideOC:'',dscOC:'',nrOC:'',ufOC:''},
+    obsCompl:'',
+    historico:[{data:'20/05/2026 16:00',usuario:'PESSOA CENTRAL',acao:'Cadastro inicial (rascunho)'}]
+  }
+];
+
+var catSelectedId = null;
+var catListado = false;
+
+function catBuildAgentSelect(selectedCod) {
+  var opts = '<option value="">Selecione...</option>';
+  tabela24.forEach(function(a) {
+    opts += '<option value="' + a.cod + '"' + (selectedCod === a.cod ? ' selected' : '') + '>' + a.cod + ' - ' + a.desc + '</option>';
+  });
+  return opts;
+}
+
+function catSituacaoBadge(sit) {
+  var map = {
+    'Ativa':'background:#d4edda;color:#155724;',
+    'Rascunho':'background:#fff3cd;color:#856404;',
+    'Anulada':'background:#f8d7da;color:#721c24;',
+    'Inativa':'background:#e2e3e5;color:#383d41;'
+  };
+  return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:bold;' + (map[sit]||'') + '">' + sit + '</span>';
+}
+
+function showMantCondicoesAmbientais() {
+  catSelectedId = null;
+  catListado = false;
+  var agentOpts = catBuildAgentSelect('');
+  var html =
+    '<div class="page-title"><i class="fa fa-leaf" style="margin-right:6px;"></i>Manter Condições Ambientais do Trabalho</div>' +
+    '<div class="page-body" id="cat-page-body">' +
+    '<div class="alt-section">' +
+      '<div class="alt-sec-title">Filtros</div>' +
+      '<div class="alt-body">' +
+        '<div class="frow">' +
+          '<div class="fg"><label>Condição ambiental</label><input type="text" id="cat-f-nome" style="width:220px" placeholder="Nome da condição"/></div>' +
+          '<div class="fg"><label>Tipo de ambiente</label><select id="cat-f-tipo" style="width:160px"><option value="">Todos</option><option>Próprio empregador</option><option>Terceiros</option></select></div>' +
+          '<div class="fg"><label>Descrição do setor</label><input type="text" id="cat-f-setor" style="width:180px" placeholder="Setor"/></div>' +
+          '<div class="fg"><label>Agente nocivo</label><select id="cat-f-agente" style="width:260px">' + agentOpts + '</select></div>' +
+        '</div>' +
+        '<div class="frow">' +
+          '<div class="fg"><label>Situação cadastral</label><select id="cat-f-sit" style="width:140px"><option value="">Todas</option><option>Rascunho</option><option>Ativa</option><option>Anulada</option><option>Inativa</option></select></div>' +
+          '<div class="fg"><label>Responsável técnico</label><input type="text" id="cat-f-resp" style="width:180px" placeholder="Nome ou CPF"/></div>' +
+          '<div class="fg"><label>Período — de</label><input type="date" id="cat-f-dtini" style="width:130px"/></div>' +
+          '<div class="fg"><label>até</label><input type="date" id="cat-f-dtfim" style="width:130px"/></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="action-bar" id="cat-action-bar">' +
+      '<button class="btn btn-green" onclick="catNovo()"><i class="fa fa-plus"></i> Novo</button>' +
+      '<button class="btn btn-blue" onclick="catListar()"><i class="fa fa-list"></i> Listar</button>' +
+      '<button class="btn btn-gray" onclick="catImprimir()"><i class="fa fa-print"></i> Imprimir</button>' +
+    '</div>' +
+    '<div id="cat-grid-area"></div>' +
+    '</div>';
+  showPage(html);
+}
+
+function catListar() {
+  catListado = true;
+  catSelectedId = null;
+  var fNome = (document.getElementById('cat-f-nome')||{value:''}).value.toLowerCase();
+  var fTipo = (document.getElementById('cat-f-tipo')||{value:''}).value;
+  var fSetor = (document.getElementById('cat-f-setor')||{value:''}).value.toLowerCase();
+  var fAgente = (document.getElementById('cat-f-agente')||{value:''}).value;
+  var fSit = (document.getElementById('cat-f-sit')||{value:''}).value;
+  var fResp = (document.getElementById('cat-f-resp')||{value:''}).value.toLowerCase();
+
+  var lista = catData.filter(function(c) {
+    if (fNome && c.nome.toLowerCase().indexOf(fNome) < 0) return false;
+    if (fTipo && c.tipoAmb !== fTipo) return false;
+    if (fSetor && c.setor.toLowerCase().indexOf(fSetor) < 0) return false;
+    if (fAgente && c.agentePrincipal.indexOf(fAgente) < 0) return false;
+    if (fSit && c.situacao !== fSit) return false;
+    if (fResp && c.responsavel.toLowerCase().indexOf(fResp) < 0) return false;
+    return true;
+  });
+
+  var html = '<table class="grid" id="cat-grid"><thead><tr>' +
+    '<th></th><th>Condição ambiental</th><th>Tipo de ambiente</th><th>Setor</th>' +
+    '<th>Atividade desempenhada</th><th>Agente nocivo principal</th>' +
+    '<th>Situação cadastral</th><th>Responsável técnico</th><th>Última alteração</th>' +
+    '</tr></thead><tbody>';
+  lista.forEach(function(c) {
+    html += '<tr id="cat-row-' + c.id + '" onclick="catSelectRow(' + c.id + ')" style="cursor:pointer;">' +
+      '<td><input type="radio" name="cat-sel" onclick="catSelectRow(' + c.id + ')"/></td>' +
+      '<td>' + c.nome + '</td>' +
+      '<td>' + c.tipoAmb + '</td>' +
+      '<td>' + c.setor + '</td>' +
+      '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + c.atividade + '</td>' +
+      '<td>' + c.agentePrincipal + '</td>' +
+      '<td>' + catSituacaoBadge(c.situacao) + '</td>' +
+      '<td>' + (c.responsavel || '<em style="color:#aaa;">—</em>') + '</td>' +
+      '<td>' + c.ultimaAlteracao + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  html += '<div style="margin-top:6px;font-size:11px;color:#7a9ab8;">' + lista.length + ' registro(s) encontrado(s)</div>';
+
+  document.getElementById('cat-grid-area').innerHTML = html;
+
+  // Adiciona +Opções após listar
+  var bar = document.getElementById('cat-action-bar');
+  if (bar && !document.getElementById('cat-dd-opcoes')) {
+    var sp = document.createElement('div'); sp.style.flex = '1';
+    bar.appendChild(sp);
+    var ddWrap = document.createElement('div');
+    ddWrap.className = 'dropdown-wrap';
+    ddWrap.innerHTML =
+      '<div style="display:flex;">' +
+        '<button class="btn btn-blue" style="border-radius:2px 0 0 2px;border-right:none;" onclick="catOpcaoInformacoes()">+ Opções</button>' +
+        '<button class="btn btn-blue" style="border-radius:0 2px 2px 0;padding:4px 7px;" onclick="toggleDropdown(event,\'cat-dd-opcoes\')"><i class="fa fa-caret-down"></i></button>' +
+      '</div>' +
+      '<div class="dropdown-menu" id="cat-dd-opcoes" style="right:0;min-width:220px;">' +
+        '<a onclick="catOpcaoInformacoes()"><i class="fa fa-edit" style="margin-right:6px;color:#5b83b2;"></i> Informações Principais</a>' +
+        '<a onclick="catOpcaoServidores()"><i class="fa fa-users" style="margin-right:6px;color:#5b83b2;"></i> Servidores vinculados</a>' +
+        '<a onclick="catOpcaoHistorico()"><i class="fa fa-history" style="margin-right:6px;color:#5b83b2;"></i> Histórico de alterações</a>' +
+      '</div>';
+    bar.appendChild(ddWrap);
+  }
+}
+
+function catSelectRow(id) {
+  catSelectedId = id;
+  document.querySelectorAll('#cat-grid tbody tr').forEach(function(r) {
+    r.classList.remove('selected');
+  });
+  var row = document.getElementById('cat-row-' + id);
+  if (row) {
+    row.classList.add('selected');
+    var radio = row.querySelector('input[type=radio]');
+    if (radio) radio.checked = true;
+  }
+}
+
+function catGetSelected() {
+  if (!catSelectedId) { alert('Selecione um registro na lista antes de usar esta opção.'); return null; }
+  return catData.find(function(c){ return c.id === catSelectedId; }) || null;
+}
+
+function catImprimir() {
+  alert('Relatório de Condições Ambientais do Trabalho gerado.');
+}
+
+function catNovo() {
+  window._catAgentesTemp = [];
+  catAbrirFormulario(null);
+}
+
+function catOpcaoInformacoes() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  var c = catGetSelected(); if (!c) return;
+  catAbrirFormulario(c);
+}
+function catOpcaoAmbiente() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  var c = catGetSelected(); if (!c) return;
+  catAbrirFormulario(c, 'ambiente');
+}
+function catOpcaoAtividade() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  var c = catGetSelected(); if (!c) return;
+  catAbrirFormulario(c, 'atividade');
+}
+function catOpcaoAgentes() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  var c = catGetSelected(); if (!c) return;
+  catAbrirFormulario(c, 'agentes');
+}
+function catOpcaoResponsavel() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  var c = catGetSelected(); if (!c) return;
+  catAbrirFormulario(c, 'responsavel');
+}
+function catOpcaoServidores() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  var c = catGetSelected(); if (!c) return;
+  catAbrirServidores(c);
+}
+function catOpcaoHistorico() {
+  document.querySelectorAll('.dropdown-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  var c = catGetSelected(); if (!c) return;
+  catAbrirHistorico(c);
+}
+
+function catAbrirFormulario(cat, secaoDestaque) {
+  var isNovo = !cat;
+  var titulo = isNovo ? 'Nova Condição Ambiental do Trabalho' : 'Alterar Condição Ambiental do Trabalho';
+  var c = cat || { id: null, nome:'', dtIni:'', dtFim:'', situacao:'Rascunho',
+    ambientes:[], agentes:[], responsavelReg:{cpfResp:'',ideOC:'',dscOC:'',nrOC:'',ufOC:''},
+    obsCompl:'', atividade:'' };
+
+  var agentOpts = catBuildAgentSelect('');
+  var ufOpts = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(function(u){
+    return '<option value="' + u + '"' + (c.responsavelReg.ufOC === u ? ' selected':'') + '>' + u + '</option>';
+  }).join('');
+
+  var html =
+    '<div class="page-title"><i class="fa fa-leaf" style="margin-right:6px;"></i>' + titulo + '</div>' +
+    '<div class="page-body">' +
+    catSecInfo(c) +
+    catSecAmbiente(c) +
+    catSecAtividade(c) +
+    catSecAgentes(c, agentOpts) +
+    catSecEpcEpi(c) +
+    catSecResponsavel(c, ufOpts) +
+    catSecObs(c) +
+    '<div class="req-note" style="margin-bottom:10px;">* Preenchimento obrigatório</div>' +
+    '<div style="display:flex;gap:8px;">' +
+      '<button class="btn btn-blue" onclick="catSalvar(' + (cat ? cat.id : 'null') + ')"><i class="fa fa-check"></i> ' + (isNovo ? 'Salvar' : 'Alterar') + '</button>' +
+      '<button class="btn btn-gray" onclick="showMantCondicoesAmbientais()"><i class="fa fa-times"></i> Cancelar</button>' +
+    '</div>' +
+    '</div>';
+
+  showPage(html);
+  if (secaoDestaque) {
+    var el = document.getElementById('cat-sec-' + secaoDestaque);
+    if (el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+}
+
+function catSecInfo(c) {
+  return '<div class="alt-section" id="cat-sec-info">' +
+    '<div class="alt-sec-title">Informações da Condição Ambiental</div>' +
+    '<div class="alt-body">' +
+      '<div class="frow">' +
+        '<div class="fg" style="flex:1;min-width:300px;">' +
+          '<label class="req">Nome/Descrição da condição ambiental <span style="color:#7a9ab8;font-weight:normal;">(nomeCondicao)</span></label>' +
+          '<input type="text" id="cat-nome" style="width:100%" value="' + (c.nome||'') + '" placeholder="Descrição da condição ambiental"/>' +
+        '</div>' +
+      '</div>' +
+      '<div class="frow">' +
+        '<div class="fg">' +
+          '<label class="req">Data de início <span style="color:#7a9ab8;font-weight:normal;">(dtIniCondicao)</span></label>' +
+          '<input type="date" id="cat-dtini" style="width:150px" value="' + (c.dtIni||'') + '"/>' +
+        '</div>' +
+        '<div class="fg">' +
+          '<label>Data fim <span style="color:#7a9ab8;font-weight:normal;">(dtFimCondicao)</span></label>' +
+          '<input type="date" id="cat-dtfim" style="width:150px" value="' + (c.dtFim||'') + '"/>' +
+        '</div>' +
+        '<div class="fg">' +
+          '<label class="req">Situação cadastral <span style="color:#7a9ab8;font-weight:normal;">(situacao)</span></label>' +
+          '<select id="cat-situacao" style="width:150px">' +
+            '<option value="Rascunho"' + (c.situacao==='Rascunho'?' selected':'') + '>Rascunho</option>' +
+            '<option value="Ativa"' + (c.situacao==='Ativa'?' selected':'') + '>Ativa</option>' +
+            '<option value="Anulada"' + (c.situacao==='Anulada'?' selected':'') + '>Anulada</option>' +
+            '<option value="Inativa"' + (c.situacao==='Inativa'?' selected':'') + '>Inativa</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function catSecAmbiente(c) {
+  var rows = '';
+  (c.ambientes||[]).forEach(function(a, i) {
+    var tipoLabel = a.localAmb === '1' ? 'Próprio empregador' : 'Terceiros';
+    var tpInscLabel = {1:'CNPJ',3:'CAEPF',4:'CNO'}[a.tpInsc] || a.tpInsc;
+    rows += '<tr>' +
+      '<td>' + tipoLabel + '</td>' +
+      '<td>' + a.dscSetor + '</td>' +
+      '<td>' + tpInscLabel + '</td>' +
+      '<td>' + a.nrInsc + '</td>' +
+      '<td><button class="icoBtn" onclick="catAmbRemover(' + i + ')"><i class="fa fa-trash"></i></button></td>' +
+    '</tr>';
+  });
+  return '<div class="alt-section" id="cat-sec-ambiente">' +
+    '<div class="alt-sec-title">Ambiente de Trabalho <span style="font-weight:normal;font-size:10px;">(máx. 9)</span></div>' +
+    '<div class="alt-body">' +
+      '<div style="font-weight:bold;color:#2a4a6a;margin-bottom:8px;font-size:11px;">Adicionar ambiente</div>' +
+      '<div class="frow">' +
+        '<div class="fg"><label class="req">Tipo de ambiente <span style="color:#7a9ab8;font-weight:normal;">(localAmb)</span></label>' +
+          '<select id="cat-amb-tipo" style="width:180px"><option value="">Selecione...</option><option value="1">1 - Próprio empregador</option><option value="2">2 - Terceiros</option></select></div>' +
+        '<div class="fg"><label class="req">Descrição do setor <span style="color:#7a9ab8;font-weight:normal;">(dscSetor)</span></label>' +
+          '<input type="text" id="cat-amb-setor" style="width:220px" maxlength="100" placeholder="Máx. 100 caracteres"/></div>' +
+        '<div class="fg"><label class="req">Tipo de inscrição <span style="color:#7a9ab8;font-weight:normal;">(tpInsc)</span></label>' +
+          '<select id="cat-amb-tpinsc" style="width:160px"><option value="">Selecione...</option><option value="1">1 - CNPJ</option><option value="3">3 - CAEPF</option><option value="4">4 - CNO</option></select></div>' +
+        '<div class="fg"><label class="req">Número de inscrição <span style="color:#7a9ab8;font-weight:normal;">(nrInsc)</span></label>' +
+          '<input type="text" id="cat-amb-nrinsc" style="width:160px" placeholder="Número"/></div>' +
+        '<div class="fg" style="justify-content:flex-end;"><button class="btn btn-blue" onclick="catAmbAdicionar()" style="margin-top:14px;"><i class="fa fa-plus"></i> Adicionar</button></div>' +
+      '</div>' +
+      '<div style="margin-top:12px;border-top:1px solid #d0dce8;padding-top:10px;">' +
+        '<div style="font-weight:bold;color:#2a4a6a;margin-bottom:6px;font-size:11px;">Lista de ambientes</div>' +
+        '<table class="grid"><thead><tr>' +
+          '<th>Tipo de ambiente</th><th>Descrição do setor</th><th>Tipo de inscrição</th><th>Número de inscrição</th><th>Ações</th>' +
+        '</tr></thead><tbody id="cat-amb-tbody">' + rows + '</tbody></table>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function catSecAtividade(c) {
+  var val = c.atividade || '';
+  var restante = 999 - val.length;
+  return '<div class="alt-section" id="cat-sec-atividade">' +
+    '<div class="alt-sec-title">Atividade Desempenhada</div>' +
+    '<div class="alt-body">' +
+      '<div class="fg" style="width:100%;">' +
+        '<label class="req">Descrição da atividade <span style="color:#7a9ab8;font-weight:normal;">(dscAtivDes)</span></label>' +
+        '<textarea id="cat-atividade" maxlength="999" style="width:100%;height:90px;padding:4px 6px;font-size:11px;border:1px solid #aabbd0;border-radius:2px;resize:vertical;" oninput="catContarChars(\'cat-atividade\',\'cat-ativ-count\',999)">' + val + '</textarea>' +
+        '<div style="font-size:10px;color:#7a9ab8;text-align:right;"><span id="cat-ativ-count">' + restante + '</span> caracteres restantes</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function catSecAgentes(c, agentOpts) {
+  var rows = '';
+  (c.agentes||[]).forEach(function(a, i) {
+    var tpAvalLabel = a.tpAval === '1' ? 'Quantitativo' : (a.tpAval === '2' ? 'Qualitativo' : '—');
+    rows += '<tr>' +
+      '<td>' + a.cod + '</td>' +
+      '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + a.desc + '</td>' +
+      '<td>' + tpAvalLabel + '</td>' +
+      '<td>' + (a.unMed||'—') + '</td>' +
+      '<td style="text-align:center;">' + (a.epc && (a.epc.utilizEPC !== '0' || a.epc.utilizEPI !== '0') ? '<i class="fa fa-check" style="color:#27ae60;"></i>' : '—') + '</td>' +
+      '<td><button class="icoBtn" onclick="catAgRemover(' + i + ')"><i class="fa fa-trash"></i></button></td>' +
+    '</tr>';
+  });
+  return '<div class="alt-section" id="cat-sec-agentes">' +
+    '<div class="alt-sec-title">Agentes Nocivos</div>' +
+    '<div class="alt-body">' +
+      '<div style="font-weight:bold;color:#2a4a6a;margin-bottom:8px;font-size:11px;">Adicionar agente nocivo</div>' +
+      '<div class="frow">' +
+        '<div class="fg"><label class="req">Código do agente <span style="color:#7a9ab8;font-weight:normal;">(codAgNoc)</span></label>' +
+          '<select id="cat-ag-cod" style="width:320px" onchange="catAgOnCodChange()">' + agentOpts + '</select></div>' +
+        '<div class="fg"><label class="req">Descrição <span style="color:#7a9ab8;font-weight:normal;">(dscAgNoc)</span></label>' +
+          '<input type="text" id="cat-ag-desc" style="width:260px" maxlength="100"/></div>' +
+      '</div>' +
+      '<div class="frow">' +
+        '<div class="fg"><label>Tipo de avaliação <span style="color:#7a9ab8;font-weight:normal;">(tpAval)</span></label>' +
+          '<select id="cat-ag-tpaval" style="width:160px" onchange="catAgOnTpAvalChange()">' +
+            '<option value="">Selecione...</option><option value="1">1 - Quantitativo</option><option value="2">2 - Qualitativo</option>' +
+          '</select></div>' +
+        '<div class="fg"><label>Nº processo judicial <span style="color:#7a9ab8;font-weight:normal;">(nrProcJud)</span></label>' +
+          '<input type="text" id="cat-ag-nrproc" style="width:180px"/></div>' +
+        '<div class="fg" style="justify-content:flex-end;"><button class="btn btn-blue" onclick="catAgAdicionar()" style="margin-top:14px;"><i class="fa fa-plus"></i> Adicionar</button></div>' +
+      '</div>' +
+      '<div id="cat-ag-quant-fields" style="display:none;">' +
+        '<div class="frow">' +
+          '<div class="fg"><label>Intensidade/Concentração <span style="color:#7a9ab8;font-weight:normal;">(intConc)</span></label>' +
+            '<input type="text" id="cat-ag-intconc" style="width:120px"/></div>' +
+          '<div class="fg"><label>Limite de tolerância <span style="color:#7a9ab8;font-weight:normal;">(limTol)</span></label>' +
+            '<input type="text" id="cat-ag-limtol" style="width:120px"/></div>' +
+          '<div class="fg"><label>Unidade de medida <span style="color:#7a9ab8;font-weight:normal;">(unMed)</span></label>' +
+            '<input type="text" id="cat-ag-unmed" style="width:100px"/></div>' +
+          '<div class="fg"><label>Técnica de medição <span style="color:#7a9ab8;font-weight:normal;">(tecMedicao)</span></label>' +
+            '<input type="text" id="cat-ag-tecmed" style="width:160px" maxlength="40"/></div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top:12px;border-top:1px solid #d0dce8;padding-top:10px;">' +
+        '<div style="font-weight:bold;color:#2a4a6a;margin-bottom:6px;font-size:11px;">Lista de agentes nocivos</div>' +
+        '<table class="grid"><thead><tr>' +
+          '<th>Código</th><th>Descrição</th><th>Tipo de avaliação</th><th>Unidade de medida</th><th>EPC/EPI</th><th>Ações</th>' +
+        '</tr></thead><tbody id="cat-ag-tbody">' + rows + '</tbody></table>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function catSecEpcEpi(c) {
+  var agentes = c.agentes || [];
+  var content = '';
+  if (!agentes.length) {
+    content = '<div style="padding:12px;color:#888;font-size:11px;"><i class="fa fa-info-circle"></i> Nenhum agente nocivo cadastrado. Adicione agentes na seção acima primeiro.</div>';
+  } else {
+    agentes.forEach(function(a, i) {
+      var disabled = a.cod === '09.01.001';
+      var epc = a.epc || {};
+      var showEpiQ = epc.utilizEPI === '2';
+      content += '<div style="border:1px solid #c8d8e8;border-radius:2px;margin-bottom:10px;">' +
+        '<div style="background:#7aaad0;color:#1a2a3a;padding:4px 10px;font-size:11px;font-weight:bold;">' +
+          a.cod + ' — ' + a.desc + (disabled ? ' <span style="font-weight:normal;font-size:10px;">(EPC/EPI não aplicável)</span>' : '') +
+        '</div>' +
+        '<div style="padding:10px 14px;">' +
+          '<div class="frow">' +
+            '<div class="fg"><label>Utilização de EPC <span style="color:#7a9ab8;font-weight:normal;">(utilizEPC)</span></label>' +
+              '<select id="cat-epc-' + i + '-utilizEPC" style="width:180px"' + (disabled?' disabled':'') + ' onchange="catEpcOnChange(' + i + ')">' +
+                '<option value="0"' + (epc.utilizEPC==='0'?' selected':'') + '>0 - Não se aplica</option>' +
+                '<option value="1"' + (epc.utilizEPC==='1'?' selected':'') + '>1 - Não implementa</option>' +
+                '<option value="2"' + (epc.utilizEPC==='2'?' selected':'') + '>2 - Implementa</option>' +
+              '</select></div>' +
+            '<div class="fg" id="cat-epc-' + i + '-eficEpc-wrap" style="' + (epc.utilizEPC==='2'?'':'display:none;') + '">' +
+              '<label class="req">Eficácia do EPC <span style="color:#7a9ab8;font-weight:normal;">(eficEpc)</span></label>' +
+              '<select id="cat-epc-' + i + '-eficEpc" style="width:120px">' +
+                '<option value="S"' + (epc.eficEpc==='S'?' selected':'') + '>S - Sim</option>' +
+                '<option value="N"' + (epc.eficEpc==='N'?' selected':'') + '>N - Não</option>' +
+              '</select></div>' +
+          '</div>' +
+          '<div class="frow">' +
+            '<div class="fg"><label>Utilização de EPI <span style="color:#7a9ab8;font-weight:normal;">(utilizEPI)</span></label>' +
+              '<select id="cat-epc-' + i + '-utilizEPI" style="width:180px"' + (disabled?' disabled':'') + ' onchange="catEpiOnChange(' + i + ')">' +
+                '<option value="0"' + (epc.utilizEPI==='0'?' selected':'') + '>0 - Não se aplica</option>' +
+                '<option value="1"' + (epc.utilizEPI==='1'?' selected':'') + '>1 - Não utilizado</option>' +
+                '<option value="2"' + (epc.utilizEPI==='2'?' selected':'') + '>2 - Utilizado</option>' +
+              '</select></div>' +
+            '<div class="fg" id="cat-epc-' + i + '-eficEpi-wrap" style="' + (showEpiQ?'':'display:none;') + '">' +
+              '<label class="req">Eficácia do EPI <span style="color:#7a9ab8;font-weight:normal;">(eficEpi)</span></label>' +
+              '<select id="cat-epc-' + i + '-eficEpi" style="width:120px">' +
+                '<option value="S"' + (epc.eficEpi==='S'?' selected':'') + '>S - Sim</option>' +
+                '<option value="N"' + (epc.eficEpi==='N'?' selected':'') + '>N - Não</option>' +
+              '</select></div>' +
+            '<div class="fg" id="cat-epc-' + i + '-docAval-wrap" style="' + (showEpiQ?'':'display:none;') + '">' +
+              '<label class="req">Documento de avaliação <span style="color:#7a9ab8;font-weight:normal;">(docAval)</span></label>' +
+              '<input type="text" id="cat-epc-' + i + '-docAval" style="width:220px" maxlength="255" value="' + (epc.docAval||'') + '"/></div>' +
+          '</div>' +
+          '<div id="cat-epc-' + i + '-epi-quest" style="' + (showEpiQ?'':'display:none;') + 'margin-top:8px;padding:10px;background:#f0f4f8;border-radius:2px;">' +
+            '<div style="font-weight:bold;color:#2a4a6a;margin-bottom:8px;font-size:11px;">Questionário EPI</div>' +
+            '<div class="frow">' +
+              catEpiQuestField(i,'medProtecao','Medida de proteção',epc.medProtecao) +
+              catEpiQuestField(i,'condFuncto','Condição de funcionamento',epc.condFuncto) +
+              catEpiQuestField(i,'usoInint','Uso ininterrupto',epc.usoInint) +
+              catEpiQuestField(i,'przValid','Prazo de validade',epc.przValid) +
+              catEpiQuestField(i,'periodicTroca','Periodicidade de troca',epc.periodicTroca) +
+              catEpiQuestField(i,'higienizacao','Higienização',epc.higienizacao) +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    });
+  }
+  return '<div class="alt-section" id="cat-sec-epc">' +
+    '<div class="alt-sec-title">EPC/EPI por Agente Nocivo</div>' +
+    '<div class="alt-body">' + content + '</div>' +
+  '</div>';
+}
+
+function catSecResponsavel(c, ufOpts) {
+  var r = c.responsavelReg || {};
+  return '<div class="alt-section" id="cat-sec-responsavel">' +
+    '<div class="alt-sec-title">Responsável pelo Registro</div>' +
+    '<div class="alt-body">' +
+      '<div class="frow">' +
+        '<div class="fg"><label class="req">CPF do responsável <span style="color:#7a9ab8;font-weight:normal;">(cpfResp)</span></label>' +
+          '<input type="text" id="cat-resp-cpf" style="width:150px" value="' + (r.cpfResp||'') + '" placeholder="000.000.000-00"/></div>' +
+        '<div class="fg"><label>Órgão de classe <span style="color:#7a9ab8;font-weight:normal;">(ideOC)</span></label>' +
+          '<select id="cat-resp-ideoc" style="width:140px" onchange="catRespOnIdeOC()">' +
+            '<option value="">Selecione...</option>' +
+            '<option value="1"' + (r.ideOC==='1'?' selected':'') + '>1 - CRM</option>' +
+            '<option value="4"' + (r.ideOC==='4'?' selected':'') + '>4 - CREA</option>' +
+            '<option value="9"' + (r.ideOC==='9'?' selected':'') + '>9 - Outros</option>' +
+          '</select></div>' +
+        '<div class="fg" id="cat-resp-dscoc-wrap" style="' + (r.ideOC==='9'?'':'display:none;') + '">' +
+          '<label class="req">Descrição do órgão <span style="color:#7a9ab8;font-weight:normal;">(dscOC)</span></label>' +
+          '<input type="text" id="cat-resp-dscoc" style="width:160px" maxlength="20" value="' + (r.dscOC||'') + '"/></div>' +
+        '<div class="fg"><label>Número de inscrição <span style="color:#7a9ab8;font-weight:normal;">(nrOC)</span></label>' +
+          '<input type="text" id="cat-resp-nroc" style="width:140px" maxlength="14" value="' + (r.nrOC||'') + '"/></div>' +
+        '<div class="fg"><label>UF <span style="color:#7a9ab8;font-weight:normal;">(ufOC)</span></label>' +
+          '<select id="cat-resp-ufoc" style="width:80px"><option value="">UF</option>' + ufOpts + '</select></div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function catSecObs(c) {
+  var val = c.obsCompl || '';
+  var restante = 999 - val.length;
+  return '<div class="alt-section" id="cat-sec-obs">' +
+    '<div class="alt-sec-title">Observações</div>' +
+    '<div class="alt-body">' +
+      '<div class="fg" style="width:100%;">' +
+        '<label>Observações complementares <span style="color:#7a9ab8;font-weight:normal;">(obsCompl)</span></label>' +
+        '<textarea id="cat-obs" maxlength="999" style="width:100%;height:80px;padding:4px 6px;font-size:11px;border:1px solid #aabbd0;border-radius:2px;resize:vertical;" oninput="catContarChars(\'cat-obs\',\'cat-obs-count\',999)">' + val + '</textarea>' +
+        '<div style="font-size:10px;color:#7a9ab8;text-align:right;"><span id="cat-obs-count">' + restante + '</span> caracteres restantes</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function catContarChars(inputId, countId, max) {
+  var el = document.getElementById(inputId);
+  var cnt = document.getElementById(countId);
+  if (el && cnt) cnt.textContent = max - el.value.length;
+}
+
+function catEpiQuestField(idx, field, label, val) {
+  return '<div class="fg"><label class="req">' + label + ' <span style="color:#7a9ab8;font-weight:normal;">(' + field + ')</span></label>' +
+    '<select id="cat-epc-' + idx + '-' + field + '" style="width:100px">' +
+      '<option value="">—</option>' +
+      '<option value="S"' + (val==='S'?' selected':'') + '>S - Sim</option>' +
+      '<option value="N"' + (val==='N'?' selected':'') + '>N - Não</option>' +
+    '</select></div>';
+}
+
+function catEpcOnChange(i) {
+  var val = (document.getElementById('cat-epc-' + i + '-utilizEPC')||{}).value;
+  var wrap = document.getElementById('cat-epc-' + i + '-eficEpc-wrap');
+  if (wrap) wrap.style.display = val === '2' ? '' : 'none';
+}
+
+function catEpiOnChange(i) {
+  var val = (document.getElementById('cat-epc-' + i + '-utilizEPI')||{}).value;
+  var show = val === '2';
+  ['eficEpi-wrap','docAval-wrap','epi-quest'].forEach(function(s) {
+    var el = document.getElementById('cat-epc-' + i + '-' + s);
+    if (el) el.style.display = show ? '' : 'none';
+  });
+}
+
+function catRespOnIdeOC() {
+  var val = (document.getElementById('cat-resp-ideoc')||{}).value;
+  var wrap = document.getElementById('cat-resp-dscoc-wrap');
+  if (wrap) wrap.style.display = val === '9' ? '' : 'none';
+}
+
+function catAgOnCodChange() {
+  var sel = document.getElementById('cat-ag-cod');
+  if (!sel) return;
+  var cod = sel.value;
+  var found = tabela24.find(function(a){ return a.cod === cod; });
+  var descEl = document.getElementById('cat-ag-desc');
+  if (descEl && found) descEl.value = found.desc;
+  catAgOnTpAvalChange();
+}
+
+function catAgOnTpAvalChange() {
+  var tpAval = (document.getElementById('cat-ag-tpaval')||{}).value;
+  var quantFields = document.getElementById('cat-ag-quant-fields');
+  if (quantFields) quantFields.style.display = tpAval === '1' ? '' : 'none';
+}
+
+function catAmbAdicionar() {
+  var tipo = (document.getElementById('cat-amb-tipo')||{}).value;
+  var setor = (document.getElementById('cat-amb-setor')||{}).value.trim();
+  var tpInsc = (document.getElementById('cat-amb-tpinsc')||{}).value;
+  var nrInsc = (document.getElementById('cat-amb-nrinsc')||{}).value.trim();
+  if (!tipo || !setor || !tpInsc || !nrInsc) { alert('Preencha todos os campos obrigatórios do ambiente.'); return; }
+  // Encontra o cat atual em edição (usa catSelectedId ou cria novo)
+  var c = catSelectedId ? catData.find(function(x){ return x.id === catSelectedId; }) : null;
+  if (!c) {
+    // Modo novo — adiciona ao tbody diretamente
+    var tbody = document.getElementById('cat-amb-tbody');
+    if (tbody) {
+      var tipoLabel = tipo === '1' ? 'Próprio empregador' : 'Terceiros';
+      var tpInscLabel = {1:'CNPJ',3:'CAEPF',4:'CNO'}[tpInsc] || tpInsc;
+      var idx = tbody.rows.length;
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + tipoLabel + '</td><td>' + setor + '</td><td>' + tpInscLabel + '</td><td>' + nrInsc + '</td>' +
+        '<td><button class="icoBtn" onclick="this.closest(\'tr\').remove()"><i class="fa fa-trash"></i></button></td>';
+      tbody.appendChild(tr);
+    }
+    return;
+  }
+  if (c.ambientes.length >= 9) { alert('Limite máximo de 9 ambientes de trabalho atingido.'); return; }
+  c.ambientes.push({ localAmb: tipo, dscSetor: setor, tpInsc: tpInsc, nrInsc: nrInsc });
+  catAbrirFormulario(c, 'ambiente');
+}
+
+function catAmbRemover(i) {
+  if (!confirm('Confirma a remoção deste ambiente de trabalho?')) return;
+  var c = catSelectedId ? catData.find(function(x){ return x.id === catSelectedId; }) : null;
+  if (!c) return;
+  c.ambientes.splice(i, 1);
+  catAbrirFormulario(c, 'ambiente');
+}
+
+function catAgAdicionar() {
+  var cod = (document.getElementById('cat-ag-cod')||{}).value;
+  var desc = (document.getElementById('cat-ag-desc')||{}).value.trim();
+  var tpAval = (document.getElementById('cat-ag-tpaval')||{}).value;
+  if (!cod || !desc) { alert('Selecione o código do agente e preencha a descrição.'); return; }
+
+  // Coleta campos quantitativos
+  var intConc = (document.getElementById('cat-ag-intconc')||{}).value;
+  var limTol  = (document.getElementById('cat-ag-limtol')||{}).value;
+  var unMed   = (document.getElementById('cat-ag-unmed')||{}).value;
+  var tecMed  = (document.getElementById('cat-ag-tecmed')||{}).value;
+  var nrProc  = (document.getElementById('cat-ag-nrproc')||{}).value;
+
+  var novoAgente = { cod:cod, desc:desc, tpAval:tpAval, intConc:intConc, limTol:limTol, unMed:unMed, tecMedicao:tecMed, nrProcJud:nrProc,
+    epc:{utilizEPC:'0',eficEpc:'',utilizEPI:'0',eficEpi:'',docAval:'',medProtecao:'',condFuncto:'',usoInint:'',przValid:'',periodicTroca:'',higienizacao:''} };
+
+  var c = catSelectedId ? catData.find(function(x){ return x.id === catSelectedId; }) : null;
+  if (!c) {
+    // Modo novo — usa array temporário no DOM
+    if (!window._catAgentesTemp) window._catAgentesTemp = [];
+    // Regra 09.01.001
+    if (cod === '09.01.001' && window._catAgentesTemp.length > 0) {
+      alert('O código 09.01.001 é exclusivo e não pode coexistir com outros agentes.'); return;
+    }
+    if (cod !== '09.01.001' && window._catAgentesTemp.some(function(a){ return a.cod === '09.01.001'; })) {
+      alert('Não é possível adicionar agentes quando o código 09.01.001 já está cadastrado.'); return;
+    }
+    window._catAgentesTemp.push(novoAgente);
+    // Atualiza grid de agentes
+    var tbody = document.getElementById('cat-ag-tbody');
+    if (tbody) {
+      var tpAvalLabel = tpAval === '1' ? 'Quantitativo' : (tpAval === '2' ? 'Qualitativo' : '—');
+      var tr = document.createElement('tr');
+      var idx = window._catAgentesTemp.length - 1;
+      tr.innerHTML = '<td>' + cod + '</td><td>' + desc + '</td><td>' + tpAvalLabel + '</td><td>' + (unMed||'—') + '</td><td>—</td>' +
+        '<td><button class="icoBtn" onclick="catAgRemoverTemp(' + idx + ')"><i class="fa fa-trash"></i></button></td>';
+      tbody.appendChild(tr);
+    }
+    // Re-renderiza seção EPC/EPI com os agentes temporários
+    catAtualizarEpcEpiSection(window._catAgentesTemp);
+    return;
+  }
+  // Regra 09.01.001
+  if (cod === '09.01.001' && c.agentes.length > 0) {
+    alert('O código 09.01.001 é exclusivo e não pode coexistir com outros agentes.'); return;
+  }
+  if (cod !== '09.01.001' && c.agentes.some(function(a){ return a.cod === '09.01.001'; })) {
+    alert('Não é possível adicionar agentes quando o código 09.01.001 já está cadastrado.'); return;
+  }
+  c.agentes.push(novoAgente);
+  catAbrirFormulario(c, 'agentes');
+}
+
+function catAgRemoverTemp(idx) {
+  if (!window._catAgentesTemp) return;
+  if (!confirm('Confirma a remoção deste agente nocivo?')) return;
+  window._catAgentesTemp.splice(idx, 1);
+  // Re-renderiza tbody
+  var tbody = document.getElementById('cat-ag-tbody');
+  if (tbody) {
+    tbody.innerHTML = '';
+    window._catAgentesTemp.forEach(function(a, i) {
+      var tpAvalLabel = a.tpAval === '1' ? 'Quantitativo' : (a.tpAval === '2' ? 'Qualitativo' : '—');
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + a.cod + '</td><td>' + a.desc + '</td><td>' + tpAvalLabel + '</td><td>' + (a.unMed||'—') + '</td><td>—</td>' +
+        '<td><button class="icoBtn" onclick="catAgRemoverTemp(' + i + ')"><i class="fa fa-trash"></i></button></td>';
+      tbody.appendChild(tr);
+    });
+  }
+  catAtualizarEpcEpiSection(window._catAgentesTemp);
+}
+
+function catAtualizarEpcEpiSection(agentes) {
+  var sec = document.getElementById('cat-sec-epc');
+  if (!sec) return;
+  var fakeC = { agentes: agentes };
+  var novoHtml = catSecEpcEpi(fakeC);
+  var tmp = document.createElement('div');
+  tmp.innerHTML = novoHtml;
+  var novoSec = tmp.firstChild;
+  sec.parentNode.replaceChild(novoSec, sec);
+}
+
+function catAgRemover(i) {
+  if (!confirm('Confirma a remoção deste agente nocivo?')) return;
+  var c = catSelectedId ? catData.find(function(x){ return x.id === catSelectedId; }) : null;
+  if (!c) return;
+  c.agentes.splice(i, 1);
+  catAbrirFormulario(c, 'agentes');
+}
+
+function catSalvar(id) {
+  var nome = (document.getElementById('cat-nome')||{}).value;
+  var dtIni = (document.getElementById('cat-dtini')||{}).value;
+  var situacao = (document.getElementById('cat-situacao')||{}).value;
+  if (!nome || !nome.trim()) {
+    alert('Informe o nome/descrição da condição ambiental.');
+    var el = document.getElementById('cat-sec-info');
+    if (el) el.scrollIntoView({behavior:'smooth'});
+    return;
+  }
+  if (!dtIni) {
+    alert('Informe a data de início (dtIniCondicao).');
+    var el = document.getElementById('cat-sec-info');
+    if (el) el.scrollIntoView({behavior:'smooth'});
+    return;
+  }
+  var dtFim = (document.getElementById('cat-dtfim')||{}).value;
+  if (dtFim && dtFim < dtIni) {
+    alert('A data fim não pode ser anterior à data de início.');
+    return;
+  }
+  var atividade = (document.getElementById('cat-atividade')||{}).value;
+  if (!atividade || !atividade.trim()) {
+    alert('Informe a descrição da atividade desempenhada.');
+    var el = document.getElementById('cat-sec-atividade');
+    if (el) el.scrollIntoView({behavior:'smooth'});
+    return;
+  }
+
+  var hoje = new Date().toISOString().split('T')[0];
+  if (id) {
+    var c = catData.find(function(x){ return x.id === id; });
+    if (c) {
+      c.nome = nome.trim();
+      c.dtIni = dtIni;
+      c.dtFim = dtFim;
+      c.situacao = situacao;
+      c.atividade = atividade.trim();
+      c.obsCompl = (document.getElementById('cat-obs')||{}).value || '';
+      c.ultimaAlteracao = new Date().toLocaleDateString('pt-BR');
+      c.historico.unshift({ data: new Date().toLocaleString('pt-BR'), usuario: usuarioAtual.nome, acao: 'Alteração de dados da condição ambiental' });
+    }
+    alert('Condição ambiental alterada com sucesso.');
+  } else {
+    var newId = catData.length ? Math.max.apply(null, catData.map(function(x){ return x.id; })) + 1 : 1;
+    catData.push({
+      id: newId, nome: nome.trim(), tipoAmb: 'Próprio empregador',
+      setor: '', atividade: atividade.trim(), agentePrincipal: '—',
+      situacao: situacao, responsavel: '', ultimaAlteracao: new Date().toLocaleDateString('pt-BR'),
+      dtIni: dtIni, dtFim: dtFim, ambientes: [], agentes: [],
+      responsavelReg: {cpfResp:'',ideOC:'',dscOC:'',nrOC:'',ufOC:''},
+      obsCompl: (document.getElementById('cat-obs')||{}).value || '',
+      historico: [{ data: new Date().toLocaleString('pt-BR'), usuario: usuarioAtual.nome, acao: 'Cadastro inicial da condição ambiental' }]
+    });
+    alert('Condição ambiental cadastrada com sucesso.');
+  }
+  showMantCondicoesAmbientais();
+}
+
+// Servidores vinculados simulados
+var catServidoresVinculados = [
+  { id:1, catId:1, nome:'RAFAELLA SILVA RODRIGUES', cpf:'000.560.832-75', mat:'0112626-3-01', catEsocial:'410', vinculo:'Efetivo', unidade:'SEAD/NUGEP', cargo:'Analista de Gestão Pública', dtIni:'2024-01-15', dtFim:'', situacao:'Ativa' },
+  { id:2, catId:1, nome:'ARTURO BERNARD NASCIMENTO GAMA', cpf:'001.240.142-03', mat:'0116353-1-03', catEsocial:'410', vinculo:'Efetivo', unidade:'SEAD/NUGEP', cargo:'Analista de Gestão Pública', dtIni:'2024-01-15', dtFim:'', situacao:'Ativa' },
+  { id:3, catId:2, nome:'JESSICA DA SILVA PINHEIRO', cpf:'003.080.302-08', mat:'0098013-0-03', catEsocial:'410', vinculo:'Efetivo', unidade:'SEAD/NUGESP', cargo:'Técnico de Controle Interno', dtIni:'2023-06-01', dtFim:'', situacao:'Ativa' }
+];
+
+function catAbrirServidores(c) {
+  var vinculados = catServidoresVinculados.filter(function(s){ return s.catId === c.id; });
+  var rows = '';
+  vinculados.forEach(function(s) {
+    rows += '<tr>' +
+      '<td>' + s.nome + '</td>' +
+      '<td>' + s.cpf + '</td>' +
+      '<td>' + s.mat + '</td>' +
+      '<td>' + s.catEsocial + '</td>' +
+      '<td>' + s.vinculo + '</td>' +
+      '<td>' + s.unidade + '</td>' +
+      '<td>' + s.cargo + '</td>' +
+      '<td>' + s.dtIni + '</td>' +
+      '<td>' + (s.dtFim || '—') + '</td>' +
+      '<td>' + catSituacaoBadge(s.situacao) + '</td>' +
+    '</tr>';
+  });
+
+  var html =
+    '<div class="page-title"><i class="fa fa-users" style="margin-right:6px;"></i>Servidores Vinculados — ' + c.nome + '</div>' +
+    '<div class="page-body">' +
+    '<div class="info-banner"><i class="fa fa-info-circle"></i> Condição: <strong>' + c.nome + '</strong> &nbsp;|&nbsp; Situação: ' + catSituacaoBadge(c.situacao) + '</div>' +
+    '<div class="action-bar">' +
+      '<button class="btn btn-green" onclick="catVincularIndividual(' + c.id + ')"><i class="fa fa-user-plus"></i> Vincular Servidor</button>' +
+      '<button class="btn btn-blue" onclick="catVincularLote(' + c.id + ')"><i class="fa fa-users"></i> Vincular em Lote</button>' +
+      '<button class="btn btn-gray" onclick="showMantCondicoesAmbientais()"><i class="fa fa-arrow-left"></i> Voltar</button>' +
+    '</div>' +
+    '<table class="grid"><thead><tr>' +
+      '<th>Servidor</th><th>CPF</th><th>Matrícula</th><th>Cat. eSocial</th><th>Vínculo</th>' +
+      '<th>Unidade</th><th>Cargo/Função</th><th>Dt. início condição</th><th>Dt. fim condição</th><th>Situação</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div style="margin-top:6px;font-size:11px;color:#7a9ab8;">' + vinculados.length + ' servidor(es) vinculado(s)</div>' +
+    '</div>';
+  showPage(html);
+}
+
+function catVincularIndividual(catId) {
+  var c = catData.find(function(x){ return x.id === catId; });
+  var html =
+    '<div class="page-title"><i class="fa fa-user-plus" style="margin-right:6px;"></i>Vincular Servidor — ' + (c ? c.nome : '') + '</div>' +
+    '<div class="page-body">' +
+    '<div class="section-box">' +
+      '<div class="section-hd">Dados do Servidor</div>' +
+      '<div class="section-bd">' +
+        '<div class="frow">' +
+          '<div class="fg"><label>Buscar servidor (nome, CPF ou matrícula)</label>' +
+            '<div style="display:flex;gap:4px;"><input type="text" id="cat-vinc-busca" style="width:280px" placeholder="Digite para buscar..."/>' +
+            '<button class="btn btn-blue" onclick="catVincBuscar()"><i class="fa fa-search"></i> Buscar</button></div></div>' +
+        '</div>' +
+        '<div id="cat-vinc-resultado"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="section-box">' +
+      '<div class="section-hd">Período de Vinculação</div>' +
+      '<div class="section-bd">' +
+        '<div class="frow">' +
+          '<div class="fg"><label class="req">Data início da condição <span style="color:#7a9ab8;font-weight:normal;">(dtIniCondicao)</span></label>' +
+            '<input type="date" id="cat-vinc-dtini" style="width:150px"/></div>' +
+          '<div class="fg"><label>Data fim da condição <span style="color:#7a9ab8;font-weight:normal;">(dtFimCondicao)</span></label>' +
+            '<input type="date" id="cat-vinc-dtfim" style="width:150px"/></div>' +
+          '<div class="fg"><label>Situação da vinculação</label>' +
+            '<select id="cat-vinc-sit" style="width:140px"><option>Ativa</option><option>Inativa</option></select></div>' +
+        '</div>' +
+        '<div class="req-note">* Preenchimento obrigatório</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="alt-actions">' +
+      '<button class="btn btn-blue" onclick="alert(\'Servidor vinculado com sucesso.\');catAbrirServidores(catData.find(function(x){return x.id===' + catId + ';}))"><i class="fa fa-check"></i> Confirmar</button>' +
+      '<button class="btn btn-gray" onclick="catAbrirServidores(catData.find(function(x){return x.id===' + catId + ';}))" ><i class="fa fa-times"></i> Cancelar</button>' +
+    '</div>' +
+    '</div>';
+  showPage(html);
+}
+
+function catVincBuscar() {
+  var q = (document.getElementById('cat-vinc-busca')||{}).value.toLowerCase();
+  var res = servidores.filter(function(s){ return s.nome.toLowerCase().indexOf(q) >= 0 || s.mat.indexOf(q) >= 0 || s.cpf.indexOf(q) >= 0; }).slice(0,5);
+  var html = '<table class="grid" style="margin-top:8px;"><thead><tr><th></th><th>Matrícula</th><th>Nome</th><th>CPF</th></tr></thead><tbody>';
+  res.forEach(function(s) {
+    html += '<tr onclick="catVincSelecionar(\'' + s.mat + '\',\'' + s.nome + '\')" style="cursor:pointer;">' +
+      '<td><input type="radio" name="cat-vinc-rad"/></td><td>' + s.mat + '</td><td>' + s.nome + '</td><td>' + s.cpf + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  var el = document.getElementById('cat-vinc-resultado');
+  if (el) el.innerHTML = html;
+}
+
+function catVincSelecionar(mat, nome) {
+  document.querySelectorAll('#cat-vinc-resultado table.grid tbody tr').forEach(function(r){ r.classList.remove('selected'); });
+  event.currentTarget.classList.add('selected');
+}
+
+function catVincularLote(catId) {
+  alert('Funcionalidade de vinculação em lote: selecione filtros de unidade, cargo e vínculo para vincular múltiplos servidores.');
+}
+
+function catAbrirHistorico(c) {
+  var hist = (c.historico || []).slice().sort(function(a,b){ return b.data.localeCompare(a.data); });
+  var rows = '';
+  hist.forEach(function(h) {
+    rows += '<tr>' +
+      '<td>' + h.data + '</td>' +
+      '<td>' + h.usuario + '</td>' +
+      '<td>' + h.acao + '</td>' +
+    '</tr>';
+  });
+
+  var html =
+    '<div class="page-title"><i class="fa fa-history" style="margin-right:6px;"></i>Histórico de Alterações — ' + c.nome + '</div>' +
+    '<div class="page-body">' +
+    '<div class="info-banner"><i class="fa fa-info-circle"></i> Condição: <strong>' + c.nome + '</strong> &nbsp;|&nbsp; Situação: ' + catSituacaoBadge(c.situacao) + '</div>' +
+    '<div class="action-bar">' +
+      '<button class="btn btn-gray" onclick="showMantCondicoesAmbientais()"><i class="fa fa-arrow-left"></i> Voltar</button>' +
+    '</div>' +
+    '<table class="grid"><thead><tr>' +
+      '<th>Data/Hora</th><th>Usuário</th><th>Ação</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div style="margin-top:6px;font-size:11px;color:#7a9ab8;">' + hist.length + ' registro(s) no histórico</div>' +
+    '</div>';
+  showPage(html);
+}
+
 </script>
 </body>
 </html>
